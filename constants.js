@@ -26,7 +26,7 @@ const C = {};
 // Number of vectors fired from the origin.
 // full 360° coverage. The lower the divisor, the more vectors.
 // Increasing this gives a smoother polygon but takes proportionally longer.
-C.VECTOR_COUNT = 360/4;
+C.VECTOR_COUNT = 360/5;
 
 // Angular spacing between consecutive vectors (degrees).
 C.VECTOR_STEP_DEG = 360/C.VECTOR_COUNT;
@@ -34,17 +34,17 @@ C.VECTOR_STEP_DEG = 360/C.VECTOR_COUNT;
 // Number of walking steps per vector.
 // Each step = distKm / VECTOR_STEPS km.
 // More steps > finer water detection, but slower.
-C.VECTOR_STEPS = 80;
+C.VECTOR_STEPS = 250;
 
 // A vector stops when remaining distance < step × this fraction.
 // Prevents an infinite tail of sub-step rounding.
-C.VECTOR_STOP_THRESHOLD = 0.5;
+C.VECTOR_STOP_THRESHOLD = .25;
 
 // Maximum redirect angle tried when a forward step hits water (normal mode).
 // The walker scans ±REDIRECT_ANGLE_STEP, ±(×2), … ±REDIRECT_ANGLE_MAX.
 // 60° chosen as the realistic limit before a detour becomes implausible
 // (e.g., a road curving sharply back on itself).
-C.REDIRECT_ANGLE_MAX = 60; // degrees
+C.REDIRECT_ANGLE_MAX = 20; // degrees
 
 // Angular increment used when scanning for a redirect bearing.
 C.REDIRECT_ANGLE_STEP = 5; // degrees
