@@ -1,15 +1,15 @@
 /**
  * range-worker.js
  *
- * Web Worker, runs in background thread so the UI never freezes.
+ * Web Worker, runs in a background thread so the UI never freezes.
+ *
+ * All tuneable values live in constants.js (C.*).
  *
  * Steps:
- *  1. Load Natural Earth 110m land polygons (TopoJSON via jsDelivr CDN)
- *  2. Build an NxN grid of land/water booleans covering the range area
- *  3. Fire 72 vectors (every 5deg) for both outer and inner radii
- *  4. Each vector walks forward in steps; water hits trigger a redirect
- *     search up to 60deg, if none found the vector stops
- *  5. Post results back to the main thread
+ *  1. Load Natural Earth land polygons (URL from C.LAND_DATA_URL)
+ *  2. Build an adaptive land grid over the range area
+ *  3. Walk C.VECTOR_COUNT vectors (C.VECTOR_STEP_DEG apart) for outer + inner radii
+ *  4. Post results back to the main thread
  *
  * Messages IN:  { clat, clng, outerKm, innerKm }
  * Messages OUT:
@@ -22,41 +22,42 @@
 
 importScripts(
   'https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js'
+  'https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js',
+  'constants.js'
 );
 
-//  Land data (cached after first load) 
-// landFeatures is an Array of GeoJSON Feature<Polygon|MultiPolygon>
+//  Land data (cached after first successful load) 
+// Stored as a flat Array of GeoJSON Feature<Polygon|MultiPolygon>
+// so isLandPoint can iterate them directly.
 let landFeatures = null;
 
 async function ensureLandData() {
-  if (landFeatures) return;
+  if (landFeatures) return; // already loaded
 
-  const url  = 'https://cdn.jsdelivr.net/npm/world-atlas@2/land-110m.json';
-  const resp = await fetch(url);
-  if (!resp.ok) throw new Error(`Failed to fetch land data (HTTP ${resp.status})`);
+  const resp = await fetch(C.LAND_DATA_URL);
+  if (!resp.ok) {
+    throw new Error(`Failed to fetch land data (HTTP ${resp.status}) from ${C.LAND_DATA_URL}`);
+  }
 
   const topo = await resp.json();
 
-  // world-atlas v2 stores land as topo.objects.land (a GeometryCollection)
   if (!topo.objects || !topo.objects.land) {
-    throw new Error('Unexpected TopoJSON structure, missing topo.objects.land');
+    throw new Error('Unexpected TopoJSON structure — missing topo.objects.land');
   }
 
   // topojson.feature returns a GeoJSON FeatureCollection
   const collection = topojson.feature(topo, topo.objects.land);
 
-  if (!collection || !collection.features || !collection.features.length) {
-    throw new Error('Land FeatureCollection is empty after conversion');
+  if (!collection || !Array.isArray(collection.features) || collection.features.length === 0) {
+    throw new Error('Land FeatureCollection is empty after TopoJSON conversion');
   }
 
-  // Store as a flat array so isLandPoint can iterate
   landFeatures = collection.features;
 }
 
 
 //  Point-in-land test 
-// Must iterate over every feature in the collection.
+// Iterates over each Feature individually.
 // turf.booleanPointInPolygon requires a single Feature, not a FeatureCollection.
 function isLandPoint(lat, lng) {
   const pt = turf.point([lng, lat]);
@@ -69,24 +70,27 @@ function isLandPoint(lat, lng) {
 
 //  Land grid 
 /**
- * Build a flat array of {lat, lng, land} objects covering the bounding box
- * of the outer circle, with a 20% margin on each side.
+ * Build a flat array of {lat, lng, land} objects.
  *
- * Grid size N is adaptive:
- *   small ranges (cycle/walk) > finer grid (~50 cells)
- *   large ranges (drive 9h)   > coarser grid (~90 cells) to keep it fast
- *
- * At 1000 km radius and N=90 the cell spacing is ~26 km,
- * enough to resolve the English Channel (34 km at narrowest).
+ * Grid size N: clamp(outerKm / C.GRID_SIZE_DIVISOR, MIN, MAX)
+ * Bounding box: outerKm × (1 + C.GRID_MARGIN_FACTOR) on each side.
  */
 function buildGrid(clat, clng, radiusKm) {
-  const N = Math.max(40, Math.min(90, Math.round(radiusKm / 10)));
+  const raw = Math.round(radiusKm / C.GRID_SIZE_DIVISOR);
+  const N   = Math.max(C.GRID_SIZE_MIN, Math.min(C.GRID_SIZE_MAX, raw));
 
-  const latDeg = (radiusKm * 1.2) / 111.32;
-  const lngDeg = (radiusKm * 1.2) / (111.32 * Math.cos(clat * Math.PI / 180));
+  const margin = C.GRID_MARGIN_FACTOR;
 
-  const minLat = clat - latDeg,  maxLat = clat + latDeg;
-  const minLng = clng - lngDeg,  maxLng = clng + lngDeg;
+  // Degrees of latitude per km (constant worldwide)
+  const latKmPerDeg = 111.32;
+  // Degrees of longitude per km (shrinks toward poles)
+  const lngKmPerDeg = 111.32 * Math.cos(clat * Math.PI / 180);
+
+  const latSpan = (radiusKm * (1 + margin)) / latKmPerDeg;
+  const lngSpan = (radiusKm * (1 + margin)) / lngKmPerDeg;
+
+  const minLat = clat - latSpan,  maxLat = clat + latSpan;
+  const minLng = clng - lngSpan,  maxLng = clng + lngSpan;
 
   const pts = [];
   for (let i = 0; i < N; i++) {
@@ -102,21 +106,18 @@ function buildGrid(clat, clng, radiusKm) {
 
 
 //  Fast grid lookup 
-/**
- * Nearest-neighbour lookup against the precomputed grid.
- * Returns false for points outside the grid boundary
- * (treating out-of-bounds as water stops the vector safely).
- */
+// Nearest-neighbour lookup. Returns false for out-of-bounds coordinates
+// (treating them as water so vectors stop safely at the grid edge).
 function gridIsLand(lat, lng, g) {
   if (lat < g.minLat || lat > g.maxLat ||
       lng < g.minLng || lng > g.maxLng) return false;
 
-  const i = Math.round(((lat - g.minLat) / (g.maxLat - g.minLat)) * (g.N - 1));
-  const j = Math.round(((lng - g.minLng) / (g.maxLng - g.minLng)) * (g.N - 1));
-  const ci = Math.max(0, Math.min(g.N - 1, i));
-  const cj = Math.max(0, Math.min(g.N - 1, j));
+  const fi = ((lat - g.minLat) / (g.maxLat - g.minLat)) * (g.N - 1);
+  const fj = ((lng - g.minLng) / (g.maxLng - g.minLng)) * (g.N - 1);
+  const i  = Math.max(0, Math.min(g.N - 1, Math.round(fi)));
+  const j  = Math.max(0, Math.min(g.N - 1, Math.round(fj)));
 
-  return g.pts[ci * g.N + cj].land;
+  return g.pts[i * g.N + j].land;
 }
 
 
@@ -125,66 +126,71 @@ function gridIsLand(lat, lng, g) {
  * Walk a single vector from (clat, clng) along `bearingDeg` for up to
  * `distKm` kilometres.
  *
- * At each step:
- *   - If the next position is land > advance
- *   - If it is water > scan 5deg, 10deg, . 60deg for a redirect bearing
- *     that leads back to land (smallest angle tried first)
- *   - If no redirect within 60deg works > stop here
+ * - VECTOR_STEPS steps, each (distKm / VECTOR_STEPS) km long
+ * - Land hit  > advance normally
+ * - Water hit > scan ±REDIRECT_ANGLE_STEP … ±REDIRECT_ANGLE_MAX for
+ *               the smallest bearing change that leads back to land
+ * - No redirect found within the cone > stop here
  *
- * Returns the endpoint as [lng, lat] (GeoJSON coordinate order).
+ * Returns endpoint as [lng, lat] (GeoJSON order).
  */
 function walkVector(clat, clng, bearingDeg, distKm, grid) {
-  const STEPS    = 80;
-  const stepKm   = distKm / STEPS;
-  const halfStep = stepKm * 0.5;
+  const steps    = C.VECTOR_STEPS;
+  const stepKm   = distKm / steps;
+  const minRem   = stepKm * C.VECTOR_STOP_THRESHOLD;
 
   let lat = clat;
   let lng = clng;
   let brg = bearingDeg;
   let rem = distKm;
 
-  while (rem > halfStep) {
-    const s   = Math.min(stepKm, rem);
-    const nxt = turf.destination(turf.point([lng, lat]), s, brg, { units: 'kilometers' });
+  while (rem > minRem) {
+    const s = Math.min(stepKm, rem);
+
+    const nxt  = turf.destination(turf.point([lng, lat]), s, brg, { units: 'kilometers' });
     const nlng = nxt.geometry.coordinates[0];
     const nlat = nxt.geometry.coordinates[1];
 
     if (gridIsLand(nlat, nlng, grid)) {
       // Normal advance
-      lat = nlat; lng = nlng; rem -= s;
+      lat = nlat;
+      lng = nlng;
+      rem -= s;
     } else {
-      // Water, search for smallest redirect angle back to land
+      // Water hit, search for smallest redirect back to land
       let redirectBrg = null;
 
-      outer:
-      for (let ang = 5; ang <= 60; ang += 5) {
+      scan:
+      for (let ang = C.REDIRECT_ANGLE_STEP;
+               ang <= C.REDIRECT_ANGLE_MAX;
+               ang += C.REDIRECT_ANGLE_STEP) {
         for (const sign of [-1, 1]) {
-          const tb  = ((brg + sign * ang) % 360 + 360) % 360;
-          const tp  = turf.destination(turf.point([lng, lat]), s, tb, { units: 'kilometers' });
+          const tb   = ((brg + sign * ang) % 360 + 360) % 360;
+          const tp   = turf.destination(turf.point([lng, lat]), s, tb, { units: 'kilometers' });
           const tlng = tp.geometry.coordinates[0];
           const tlat = tp.geometry.coordinates[1];
           if (gridIsLand(tlat, tlng, grid)) {
             redirectBrg = tb;
-            break outer;
+            break scan;
           }
         }
       }
 
       if (redirectBrg === null) {
-        // Cannot navigate back to land within 60deg, stop
+        // No land found within the redirect cone — stop the vector
         break;
       }
 
       // Take one redirected step and continue
       brg = redirectBrg;
-      const ap  = turf.destination(turf.point([lng, lat]), s, brg, { units: 'kilometers' });
+      const ap = turf.destination(turf.point([lng, lat]), s, brg, { units: 'kilometers' });
       lat = ap.geometry.coordinates[1];
       lng = ap.geometry.coordinates[0];
       rem -= s;
     }
   }
 
-  return [lng, lat];
+  return [lng, lat]; // GeoJSON: [lng, lat]
 }
 
 
@@ -193,11 +199,11 @@ self.onmessage = async function (evt) {
   const { clat, clng, outerKm, innerKm } = evt.data;
 
   try {
-    // 1. Load land data
-    self.postMessage({ type: 'status', msg: 'Loading Natural Earth land data.' });
+    // 1. Load land data (cached after first call)
+    self.postMessage({ type: 'status', msg: 'Loading Natural Earth land data…' });
     await ensureLandData();
 
-    // 2. Sanity-check: origin must be on land
+    // 2. Origin sanity check
     if (!isLandPoint(clat, clng)) {
       self.postMessage({
         type: 'error',
@@ -207,47 +213,51 @@ self.onmessage = async function (evt) {
     }
 
     // 3. Build land grid
-    const N = Math.max(40, Math.min(90, Math.round(outerKm / 10)));
-    self.postMessage({ type: 'status', msg: `Building ${N}x${N} land grid.` });
+    const raw = Math.round(outerKm / C.GRID_SIZE_DIVISOR);
+    const N   = Math.max(C.GRID_SIZE_MIN, Math.min(C.GRID_SIZE_MAX, raw));
+    self.postMessage({ type: 'status', msg: `Building ${N}×${N} land grid…` });
+
     const grid = buildGrid(clat, clng, outerKm);
 
-    // Send grid back for map visualisation (land points only to keep payload small)
+    // Send land-only points to main thread for map display
     self.postMessage({ type: 'grid', pts: grid.pts.filter(p => p.land) });
 
-    // 4. Walk 72 vectors (one every 5deg)
-    self.postMessage({ type: 'status', msg: 'Walking 72 vectors.' });
+    // 4. Walk vectors
+    self.postMessage({ type: 'status', msg: `Walking ${C.VECTOR_COUNT} vectors…` });
 
     const outerRing = [];
     const innerRing = [];
 
-    for (let i = 0; i < 72; i++) {
-      const deg = i * 5;
+    // Report progress every 1/8th of the total vectors
+    const progressInterval = Math.max(1, Math.round(C.VECTOR_COUNT / 8));
+
+    for (let i = 0; i < C.VECTOR_COUNT; i++) {
+      const deg = i * C.VECTOR_STEP_DEG;
       outerRing.push(walkVector(clat, clng, deg, outerKm, grid));
       innerRing.push(walkVector(clat, clng, deg, innerKm, grid));
 
-      // Post progress every 9 vectors (every 45deg)
-      if (i % 9 === 0) {
-        self.postMessage({ type: 'progress', pct: Math.round((i / 72) * 100) });
+      if (i % progressInterval === 0) {
+        self.postMessage({ type: 'progress', pct: Math.round((i / C.VECTOR_COUNT) * 100) });
       }
     }
 
-    // 5. Close rings (GeoJSON polygon: first coord must equal last)
+    // 5. Close rings (GeoJSON polygon: first === last)
     const outerClosed = [...outerRing, outerRing[0]];
     const innerClosed = [...innerRing, innerRing[0]];
 
     // 6. Build GeoJSON features
     const outerGeo = {
-      type: 'Feature',
-      geometry: { type: 'Polygon', coordinates: [outerClosed] },
+      type:       'Feature',
+      geometry:   { type: 'Polygon', coordinates: [outerClosed] },
       properties: {}
     };
     const innerGeo = {
-      type: 'Feature',
-      geometry: { type: 'Polygon', coordinates: [innerClosed] },
+      type:       'Feature',
+      geometry:   { type: 'Polygon', coordinates: [innerClosed] },
       properties: {}
     };
 
-    // 7. Done, send everything back
+    // 7. Done
     self.postMessage({ type: 'progress', pct: 100 });
     self.postMessage({ type: 'done', outerRing, innerRing, outerGeo, innerGeo });
 
