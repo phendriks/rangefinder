@@ -403,12 +403,14 @@ function renderGrid(pts) {
   const showGrid = document.getElementById('show-grid').checked;
 
   pts.forEach(p => {
+    const isCrossing = p.cell === C.CELL_CROSSING;
+    const colour     = isCrossing ? '#e08020' : '#28a050'; // orange = crossing, green = land
     const m = L.circleMarker([p.lat, p.lng], {
       renderer:    canvasRenderer,
-      radius:      C.GRID_DOT_RADIUS,
-      color:       '#28a050',
-      fillColor:   '#28a050',
-      fillOpacity: 0.45,
+      radius:      isCrossing ? C.GRID_DOT_RADIUS + 1 : C.GRID_DOT_RADIUS,
+      color:       colour,
+      fillColor:   colour,
+      fillOpacity: 0.55,
       weight:      0
     });
     if (showGrid) m.addTo(map);

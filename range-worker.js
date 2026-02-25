@@ -1,20 +1,26 @@
 /**
  * range-worker.js
  *
- * Web Worker, runs in a background thread so the UI never freezes.
- *
+ * Web Worker — runs in a background thread so the UI never freezes.
  * All tuneable values live in constants.js (C.*).
  *
- * Steps:
- *  1. Load Natural Earth land polygons (URL from C.LAND_DATA_URL)
- *  2. Build an adaptive land grid over the range area
- *  3. Walk C.VECTOR_COUNT vectors (C.VECTOR_STEP_DEG apart) for outer + inner radii
- *  4. Post results back to the main thread
+ * Key behaviours:
+ *   - Grid cells are classified as C.CELL_WATER (0), C.CELL_LAND (1),
+ *     or C.CELL_CROSSING (2) — water inside a known ferry/bridge corridor.
+ *   - Crossing cells are traversable but cost more budget
+ *     (step × C.CROSSING_DISTANCE_FACTOR).
+ *   - When a vector gets stuck (no redirect within ±REDIRECT_ANGLE_MAX),
+ *     it enters recovery mode: it remembers its original bearing and gets
+ *     up to RECOVERY_MAX_STEPS attempts with a wider scan to work its way
+ *     back. If it returns within RECOVERY_RETURN_THRESHOLD_DEG of the
+ *     original bearing it continues normally. If it exhausts recovery steps
+ *     without returning, the vector stops. The same logic re-applies if
+ *     the vector gets stuck again later.
  *
  * Messages IN:  { clat, clng, outerKm, innerKm }
  * Messages OUT:
  *   { type: 'status',   msg }
- *   { type: 'grid',     pts: [{lat, lng, land}] }
+ *   { type: 'grid',     pts: [{lat, lng, cell}] }   cell = 0/1/2
  *   { type: 'progress', pct }
  *   { type: 'done',     outerRing, innerRing, outerGeo, innerGeo }
  *   { type: 'error',    msg }
@@ -26,29 +32,28 @@ importScripts(
   'constants.js'
 );
 
-//  Land data (cached after first successful load) 
-// Stored as a flat Array of GeoJSON Feature<Polygon|MultiPolygon>
-// so isLandPoint can iterate them directly.
+
+//  Land data cache 
+// Stored as a flat Array of GeoJSON Feature so isLandPoint can
+// iterate each polygon individually (FeatureCollection not accepted
+// by turf.booleanPointInPolygon).
 let landFeatures = null;
 
 async function ensureLandData() {
-  if (landFeatures) return; // already loaded
+  if (landFeatures) return;
 
   const resp = await fetch(C.LAND_DATA_URL);
-  if (!resp.ok) {
-    throw new Error(`Failed to fetch land data (HTTP ${resp.status}) from ${C.LAND_DATA_URL}`);
-  }
+  if (!resp.ok) throw new Error(`Land data fetch failed (HTTP ${resp.status})`);
 
   const topo = await resp.json();
 
-  if (!topo.objects || !topo.objects.land) {
+  if (!topo.objects?.land) {
     throw new Error('Unexpected TopoJSON structure — missing topo.objects.land');
   }
 
-  // topojson.feature returns a GeoJSON FeatureCollection
   const collection = topojson.feature(topo, topo.objects.land);
 
-  if (!collection || !Array.isArray(collection.features) || collection.features.length === 0) {
+  if (!Array.isArray(collection.features) || !collection.features.length) {
     throw new Error('Land FeatureCollection is empty after TopoJSON conversion');
   }
 
@@ -56,9 +61,7 @@ async function ensureLandData() {
 }
 
 
-//  Point-in-land test 
-// Iterates over each Feature individually.
-// turf.booleanPointInPolygon requires a single Feature, not a FeatureCollection.
+//  Raw land test (polygon level) 
 function isLandPoint(lat, lng) {
   const pt = turf.point([lng, lat]);
   for (let i = 0; i < landFeatures.length; i++) {
@@ -68,36 +71,54 @@ function isLandPoint(lat, lng) {
 }
 
 
+//  Crossing zone test 
+// Returns true if (lat, lng) falls inside any defined crossing corridor.
+function isCrossingZone(lat, lng) {
+  for (let i = 0; i < C.CROSSING_ZONES.length; i++) {
+    const z = C.CROSSING_ZONES[i]; // [name, minLat, maxLat, minLng, maxLng]
+    if (lat >= z[1] && lat <= z[2] && lng >= z[3] && lng <= z[4]) return true;
+  }
+  return false;
+}
+
+
+//  Cell classification 
+// Combines land polygon test + crossing zone test into the 0/1/2 enum.
+function classifyCell(lat, lng) {
+  if (isLandPoint(lat, lng)) return C.CELL_LAND;
+  if (isCrossingZone(lat, lng)) return C.CELL_CROSSING;
+  return C.CELL_WATER;
+}
+
+
 //  Land grid 
 /**
- * Build a flat array of {lat, lng, land} objects.
- *
- * Grid size N: clamp(outerKm / C.GRID_SIZE_DIVISOR, MIN, MAX)
- * Bounding box: outerKm × (1 + C.GRID_MARGIN_FACTOR) on each side.
+ * Build a flat array of {lat, lng, cell} objects covering the bounding box
+ * of the outer radius with C.GRID_MARGIN_FACTOR padding on each side.
+ * Grid size N is adaptive: clamp(outerKm / DIVISOR, MIN, MAX).
  */
 function buildGrid(clat, clng, radiusKm) {
-  const raw = Math.round(radiusKm / C.GRID_SIZE_DIVISOR);
-  const N   = Math.max(C.GRID_SIZE_MIN, Math.min(C.GRID_SIZE_MAX, raw));
+  const N = Math.max(
+    C.GRID_SIZE_MIN,
+    Math.min(C.GRID_SIZE_MAX, Math.round(radiusKm / C.GRID_SIZE_DIVISOR))
+  );
 
-  const margin = C.GRID_MARGIN_FACTOR;
-
-  // Degrees of latitude per km (constant worldwide)
   const latKmPerDeg = 111.32;
-  // Degrees of longitude per km (shrinks toward poles)
   const lngKmPerDeg = 111.32 * Math.cos(clat * Math.PI / 180);
+  const m = C.GRID_MARGIN_FACTOR;
 
-  const latSpan = (radiusKm * (1 + margin)) / latKmPerDeg;
-  const lngSpan = (radiusKm * (1 + margin)) / lngKmPerDeg;
+  const latSpan = (radiusKm * (1 + m)) / latKmPerDeg;
+  const lngSpan = (radiusKm * (1 + m)) / lngKmPerDeg;
 
-  const minLat = clat - latSpan,  maxLat = clat + latSpan;
-  const minLng = clng - lngSpan,  maxLng = clng + lngSpan;
+  const minLat = clat - latSpan, maxLat = clat + latSpan;
+  const minLng = clng - lngSpan, maxLng = clng + lngSpan;
 
   const pts = [];
   for (let i = 0; i < N; i++) {
     const lat = minLat + (i / (N - 1)) * (maxLat - minLat);
     for (let j = 0; j < N; j++) {
       const lng = minLng + (j / (N - 1)) * (maxLng - minLng);
-      pts.push({ lat, lng, land: isLandPoint(lat, lng) });
+      pts.push({ lat, lng, cell: classifyCell(lat, lng) });
     }
   }
 
@@ -105,88 +126,184 @@ function buildGrid(clat, clng, radiusKm) {
 }
 
 
-//  Fast grid lookup 
-// Nearest-neighbour lookup. Returns false for out-of-bounds coordinates
-// (treating them as water so vectors stop safely at the grid edge).
-function gridIsLand(lat, lng, g) {
+//  Grid lookup 
+// Nearest-neighbour. Returns C.CELL_WATER for out-of-bounds positions
+// so vectors stop safely at the grid edge.
+function gridCell(lat, lng, g) {
   if (lat < g.minLat || lat > g.maxLat ||
-      lng < g.minLng || lng > g.maxLng) return false;
+      lng < g.minLng || lng > g.maxLng) return C.CELL_WATER;
 
-  const fi = ((lat - g.minLat) / (g.maxLat - g.minLat)) * (g.N - 1);
-  const fj = ((lng - g.minLng) / (g.maxLng - g.minLng)) * (g.N - 1);
-  const i  = Math.max(0, Math.min(g.N - 1, Math.round(fi)));
-  const j  = Math.max(0, Math.min(g.N - 1, Math.round(fj)));
+  const i = Math.max(0, Math.min(g.N - 1,
+    Math.round(((lat - g.minLat) / (g.maxLat - g.minLat)) * (g.N - 1))
+  ));
+  const j = Math.max(0, Math.min(g.N - 1,
+    Math.round(((lng - g.minLng) / (g.maxLng - g.minLng)) * (g.N - 1))
+  ));
 
-  return g.pts[i * g.N + j].land;
+  return g.pts[i * g.N + j].cell;
+}
+
+
+//  Bearing helpers 
+function normBearing(b) { return ((b % 360) + 360) % 360; }
+
+// Smallest signed angle between two bearings (-180 to +180).
+function bearingDiff(a, b) {
+  let d = normBearing(b) - normBearing(a);
+  if (d >  180) d -= 360;
+  if (d < -180) d += 360;
+  return d;
+}
+
+
+//  Scan for a passable bearing 
+/**
+ * Starting from `fromBrg`, try offsets ±step, ±2×step … ±maxAngle.
+ * Returns the first bearing that leads to a LAND or CROSSING cell,
+ * or null if none found within the cone.
+ */
+function scanForPassable(lat, lng, fromBrg, stepKm, maxAngle, grid) {
+  for (let ang = C.REDIRECT_ANGLE_STEP; ang <= maxAngle; ang += C.REDIRECT_ANGLE_STEP) {
+    for (const sign of [-1, 1]) {
+      const tb  = normBearing(fromBrg + sign * ang);
+      const tp  = turf.destination(turf.point([lng, lat]), stepKm, tb, { units: 'kilometers' });
+      const tlng = tp.geometry.coordinates[0];
+      const tlat = tp.geometry.coordinates[1];
+      const tc   = gridCell(tlat, tlng, grid);
+      if (tc === C.CELL_LAND || tc === C.CELL_CROSSING) return tb;
+    }
+  }
+  return null;
 }
 
 
 //  Vector walking 
 /**
- * Walk a single vector from (clat, clng) along `bearingDeg` for up to
- * `distKm` kilometres.
+ * Walk a single vector from (clat, clng) along originalBearing for
+ * up to distKm kilometres.
  *
- * - VECTOR_STEPS steps, each (distKm / VECTOR_STEPS) km long
- * - Land hit  > advance normally
- * - Water hit > scan ±REDIRECT_ANGLE_STEP … ±REDIRECT_ANGLE_MAX for
- *               the smallest bearing change that leads back to land
- * - No redirect found within the cone > stop here
+ * Normal mode:
+ *   - LAND step     → advance, consume stepKm from budget
+ *   - CROSSING step → advance, consume stepKm × CROSSING_DISTANCE_FACTOR
+ *   - WATER step    → try redirect within ±REDIRECT_ANGLE_MAX
+ *                     • redirect found → take it, stay in normal mode
+ *                     • no redirect   → enter recovery mode
+ *
+ * Recovery mode (entered when normal redirect fails):
+ *   - Remember originalBearing at entry.
+ *   - Each recovery step: try wider scan ±RECOVERY_SCAN_ANGLE_MAX.
+ *     • passable bearing found → take it, decrement recoveryStepsLeft.
+ *       If now within RECOVERY_RETURN_THRESHOLD_DEG of originalBearing
+ *       → snap bearing back, exit recovery, continue normally.
+ *     • nothing found at all → stop the vector.
+ *   - If recoveryStepsLeft hits 0 without returning → stop.
  *
  * Returns endpoint as [lng, lat] (GeoJSON order).
  */
-function walkVector(clat, clng, bearingDeg, distKm, grid) {
-  const steps    = C.VECTOR_STEPS;
-  const stepKm   = distKm / steps;
-  const minRem   = stepKm * C.VECTOR_STOP_THRESHOLD;
+function walkVector(clat, clng, originalBearing, distKm, grid) {
+  const stepKm  = distKm / C.VECTOR_STEPS;
+  const minRem  = stepKm * C.VECTOR_STOP_THRESHOLD;
 
   let lat = clat;
   let lng = clng;
-  let brg = bearingDeg;
+  let brg = originalBearing;
   let rem = distKm;
 
-  while (rem > minRem) {
-    const s = Math.min(stepKm, rem);
+  // Recovery state
+  let recovering        = false;
+  let recoveryStepsLeft = 0;
 
-    const nxt  = turf.destination(turf.point([lng, lat]), s, brg, { units: 'kilometers' });
+  while (rem > minRem) {
+    const s   = Math.min(stepKm, rem);
+    const nxt = turf.destination(turf.point([lng, lat]), s, brg, { units: 'kilometers' });
     const nlng = nxt.geometry.coordinates[0];
     const nlat = nxt.geometry.coordinates[1];
+    const cell = gridCell(nlat, nlng, grid);
 
-    if (gridIsLand(nlat, nlng, grid)) {
-      // Normal advance
-      lat = nlat;
-      lng = nlng;
-      rem -= s;
-    } else {
-      // Water hit, search for smallest redirect back to land
-      let redirectBrg = null;
+    //  LAND: normal advance 
+    if (cell === C.CELL_LAND) {
+      lat = nlat; lng = nlng; rem -= s;
 
-      scan:
-      for (let ang = C.REDIRECT_ANGLE_STEP;
-               ang <= C.REDIRECT_ANGLE_MAX;
-               ang += C.REDIRECT_ANGLE_STEP) {
-        for (const sign of [-1, 1]) {
-          const tb   = ((brg + sign * ang) % 360 + 360) % 360;
-          const tp   = turf.destination(turf.point([lng, lat]), s, tb, { units: 'kilometers' });
-          const tlng = tp.geometry.coordinates[0];
-          const tlat = tp.geometry.coordinates[1];
-          if (gridIsLand(tlat, tlng, grid)) {
-            redirectBrg = tb;
-            break scan;
-          }
+      // If we were recovering, check whether we've returned to
+      // within the threshold of the original bearing
+      if (recovering) {
+        if (Math.abs(bearingDiff(brg, originalBearing)) <= C.RECOVERY_RETURN_THRESHOLD_DEG) {
+          // Recovered — snap back and resume normal mode
+          brg       = originalBearing;
+          recovering = false;
+        } else {
+          recoveryStepsLeft--;
+          if (recoveryStepsLeft <= 0) break; // exhausted recovery — stop
         }
       }
+      continue;
+    }
 
-      if (redirectBrg === null) {
-        // No land found within the redirect cone — stop the vector
-        break;
+    //  CROSSING: advance at extra cost 
+    if (cell === C.CELL_CROSSING) {
+      lat  = nlat;
+      lng  = nlng;
+      rem -= s * C.CROSSING_DISTANCE_FACTOR; // crossing eats more budget
+
+      if (recovering) {
+        // Crossing counts as a recovery step; check return condition
+        if (Math.abs(bearingDiff(brg, originalBearing)) <= C.RECOVERY_RETURN_THRESHOLD_DEG) {
+          brg       = originalBearing;
+          recovering = false;
+        } else {
+          recoveryStepsLeft--;
+          if (recoveryStepsLeft <= 0) break;
+        }
+      }
+      continue;
+    }
+
+    //  WATER 
+    if (!recovering) {
+      // Normal mode: try redirect within the standard cone
+      const redirectBrg = scanForPassable(lat, lng, brg, s, C.REDIRECT_ANGLE_MAX, grid);
+      if (redirectBrg !== null) {
+        // Redirect found — take it and stay in normal mode
+        brg = redirectBrg;
+        // We do NOT advance here; the next loop iteration will try the step
+        // with the new bearing (avoids double-advancing)
+        continue;
       }
 
-      // Take one redirected step and continue
-      brg = redirectBrg;
-      const ap = turf.destination(turf.point([lng, lat]), s, brg, { units: 'kilometers' });
-      lat = ap.geometry.coordinates[1];
-      lng = ap.geometry.coordinates[0];
-      rem -= s;
+      // No redirect within standard cone — enter recovery
+      recovering        = true;
+      recoveryStepsLeft = C.RECOVERY_MAX_STEPS;
+    }
+
+    // Recovery mode: wider scan
+    const recoveryBrg = scanForPassable(lat, lng, originalBearing, s, C.RECOVERY_SCAN_ANGLE_MAX, grid);
+    if (recoveryBrg === null) {
+      // Completely surrounded — stop
+      break;
+    }
+
+    // Take the recovery step
+    brg = recoveryBrg;
+    const rp   = turf.destination(turf.point([lng, lat]), s, brg, { units: 'kilometers' });
+    const rlng = rp.geometry.coordinates[0];
+    const rlat = rp.geometry.coordinates[1];
+    const rc   = gridCell(rlat, rlng, grid);
+
+    if (rc === C.CELL_WATER) {
+      // Even the best recovery bearing leads to water — stop
+      break;
+    }
+
+    const cost = rc === C.CELL_CROSSING ? s * C.CROSSING_DISTANCE_FACTOR : s;
+    lat = rlat; lng = rlng; rem -= cost;
+
+    // Check recovery return condition
+    if (Math.abs(bearingDiff(brg, originalBearing)) <= C.RECOVERY_RETURN_THRESHOLD_DEG) {
+      brg       = originalBearing;
+      recovering = false;
+    } else {
+      recoveryStepsLeft--;
+      if (recoveryStepsLeft <= 0) break;
     }
   }
 
@@ -203,7 +320,7 @@ self.onmessage = async function (evt) {
     self.postMessage({ type: 'status', msg: 'Loading Natural Earth land data…' });
     await ensureLandData();
 
-    // 2. Origin sanity check
+    // 2. Origin must be on land
     if (!isLandPoint(clat, clng)) {
       self.postMessage({
         type: 'error',
@@ -212,48 +329,51 @@ self.onmessage = async function (evt) {
       return;
     }
 
-    // 3. Build land grid
-    const raw = Math.round(outerKm / C.GRID_SIZE_DIVISOR);
-    const N   = Math.max(C.GRID_SIZE_MIN, Math.min(C.GRID_SIZE_MAX, raw));
+    // 3. Build grid
+    const N = Math.max(
+      C.GRID_SIZE_MIN,
+      Math.min(C.GRID_SIZE_MAX, Math.round(outerKm / C.GRID_SIZE_DIVISOR))
+    );
     self.postMessage({ type: 'status', msg: `Building ${N}×${N} land grid…` });
-
     const grid = buildGrid(clat, clng, outerKm);
 
-    // Send land-only points to main thread for map display
-    self.postMessage({ type: 'grid', pts: grid.pts.filter(p => p.land) });
+    // Send all non-water cells to the main thread for visualisation.
+    // Include cell type so the map can colour land vs crossing differently.
+    self.postMessage({
+      type: 'grid',
+      pts:  grid.pts.filter(p => p.cell !== C.CELL_WATER)
+    });
 
     // 4. Walk vectors
     self.postMessage({ type: 'status', msg: `Walking ${C.VECTOR_COUNT} vectors…` });
 
     const outerRing = [];
     const innerRing = [];
-
-    // Report progress every 1/8th of the total vectors
-    const progressInterval = Math.max(1, Math.round(C.VECTOR_COUNT / 8));
+    const progressEvery = Math.max(1, Math.round(C.VECTOR_COUNT / 8));
 
     for (let i = 0; i < C.VECTOR_COUNT; i++) {
       const deg = i * C.VECTOR_STEP_DEG;
       outerRing.push(walkVector(clat, clng, deg, outerKm, grid));
       innerRing.push(walkVector(clat, clng, deg, innerKm, grid));
 
-      if (i % progressInterval === 0) {
+      if (i % progressEvery === 0) {
         self.postMessage({ type: 'progress', pct: Math.round((i / C.VECTOR_COUNT) * 100) });
       }
     }
 
-    // 5. Close rings (GeoJSON polygon: first === last)
+    // 5. Close rings (GeoJSON polygon: first coord === last coord)
     const outerClosed = [...outerRing, outerRing[0]];
     const innerClosed = [...innerRing, innerRing[0]];
 
     // 6. Build GeoJSON features
     const outerGeo = {
-      type:       'Feature',
-      geometry:   { type: 'Polygon', coordinates: [outerClosed] },
+      type: 'Feature',
+      geometry: { type: 'Polygon', coordinates: [outerClosed] },
       properties: {}
     };
     const innerGeo = {
-      type:       'Feature',
-      geometry:   { type: 'Polygon', coordinates: [innerClosed] },
+      type: 'Feature',
+      geometry: { type: 'Polygon', coordinates: [innerClosed] },
       properties: {}
     };
 

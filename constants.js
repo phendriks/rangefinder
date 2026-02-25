@@ -3,23 +3,24 @@
  *
  * Single source of truth for every tuneable value in Range Finder.
  * Loaded in the browser via <script> and in the Web Worker via importScripts().
- * Both contexts attach to the global `self`, so everything is accessible as
- * C.SOMETHING throughout the codebase.
+ * Both contexts attach to `self`, so C.* is globally accessible everywhere.
  *
  * Sections:
- *   1. Vector walking
- *   2. Land grid
- *   3. Tortuosity (mode + terrain)
- *   4. Mode definitions (speed + tortuosity reference)
- *   5. Country database (highway limits + default terrain)
- *   6. External data sources
+ *   1.  Vector walking — basic geometry
+ *   2.  Vector recovery — behaviour when stuck against water
+ *   3.  Water crossing zones — bridge / ferry / tunnel corridors
+ *   4.  Land grid
+ *   5.  Tortuosity (mode + terrain)
+ *   6.  Mode definitions (speed + tortuosity)
+ *   7.  Country database (highway limits + default terrain)
+ *   8.  External data sources + geocoding
  */
 
 const C = {};
 
 
 // ═══════════════════════════════════════════════════════════════════
-// 1. VECTOR WALKING
+// 1. VECTOR WALKING — basic geometry
 // ═══════════════════════════════════════════════════════════════════
 
 // Number of vectors fired from the origin.
@@ -27,58 +28,178 @@ const C = {};
 // Increasing this gives a smoother polygon but takes proportionally longer.
 C.VECTOR_COUNT = 360/4;
 
-// Angular spacing between vectors in degrees.
-// Must satisfy: VECTOR_COUNT × VECTOR_STEP_DEG === 360
+// Angular spacing between consecutive vectors (degrees).
 C.VECTOR_STEP_DEG = 360/C.VECTOR_COUNT;
 
 // Number of walking steps per vector.
-// Each step covers (radius / VECTOR_STEPS) km.
-// More steps = finer water-detection resolution, but slower.
+// Each step = distKm / VECTOR_STEPS km.
+// More steps > finer water detection, but slower.
 C.VECTOR_STEPS = 80;
 
-// Minimum remaining distance (as a fraction of one step) before a vector stops.
-// Prevents overshoot at the very end of the walk.
-C.VECTOR_STOP_THRESHOLD = 0.5; // fraction of one step
+// A vector stops when remaining distance < step × this fraction.
+// Prevents an infinite tail of sub-step rounding.
+C.VECTOR_STOP_THRESHOLD = 0.5;
 
-// Maximum redirect angle (degrees) when a vector hits water.
-// The walker tries ±REDIRECT_ANGLE_MIN, ±(+step), … ±REDIRECT_ANGLE_MAX.
-// If no bearing within this cone leads back to land, the vector stops.
-C.REDIRECT_ANGLE_MAX = 45; // degrees
+// Maximum redirect angle tried when a forward step hits water (normal mode).
+// The walker scans ±REDIRECT_ANGLE_STEP, ±(×2), … ±REDIRECT_ANGLE_MAX.
+// 60° chosen as the realistic limit before a detour becomes implausible
+// (e.g., a road curving sharply back on itself).
+C.REDIRECT_ANGLE_MAX = 60; // degrees
 
-// Increment between redirect angle attempts.
-// Smaller = more precise coastline hugging but slower per water hit.
+// Angular increment used when scanning for a redirect bearing.
 C.REDIRECT_ANGLE_STEP = 5; // degrees
 
 
 // ═══════════════════════════════════════════════════════════════════
-// 2. LAND GRID
+// 2. VECTOR RECOVERY
+//
+// When a vector is completely stuck — no land within ±REDIRECT_ANGLE_MAX —
+// instead of stopping immediately it enters recovery mode.
+//
+// Recovery logic:
+//   a) Try a wider scan up to ±RECOVERY_SCAN_ANGLE_MAX.
+//   b) Take whatever step is available (any land / crossing cell).
+//   c) After each recovery step, check whether the current bearing is
+//      within RECOVERY_RETURN_THRESHOLD_DEG of the *original* bearing
+//      (the bearing the vector was first fired at).
+//   d) If yes → "recovered": snap bearing back to original, exit recovery,
+//      continue normally for the rest of the vector's budget.
+//   e) If not → decrement RECOVERY_MAX_STEPS.
+//   f) If steps reach 0 without recovering → stop.
+//
+// The same logic re-applies if the vector gets stuck again later.
 // ═══════════════════════════════════════════════════════════════════
 
-// The grid covers the bounding box of the outer circle with this extra
-// margin on all sides, as a fraction of the radius.
+// How many recovery steps are allowed before the vector gives up.
+C.RECOVERY_MAX_STEPS = 5;
+
+// Wider redirect scan used during recovery (degrees from current bearing).
+// Must be > REDIRECT_ANGLE_MAX so recovery actually tries new directions.
+C.RECOVERY_SCAN_ANGLE_MAX = 90;
+
+// The vector is considered "recovered" once its current bearing is within
+// this many degrees of the original bearing.
+// 20° gives a comfortable margin without accepting a wildly different direction.
+C.RECOVERY_RETURN_THRESHOLD_DEG = 20;
+
+
+// ═══════════════════════════════════════════════════════════════════
+// 3. WATER CROSSING ZONES
+//
+// Cell type enum used throughout the grid and vector walker:
+//   0 = water       — impassable; triggers redirect / recovery logic
+//   1 = land        — normal advance
+//   2 = crossing    — passable (ferry / tunnel / bridge) but the step
+//                     consumes CROSSING_DISTANCE_FACTOR × its physical km
+//                     from the remaining budget, modelling slower speed
+//                     (boarding, sea crossing, waiting time, etc.)
+//
+// Crossing zones are bounding boxes [minLat, maxLat, minLng, maxLng].
+// A water cell inside a crossing zone is reclassified to type 2.
+// Land cells inside crossing zones keep type 1.
+//
+// Factor rationale: ferries average 20–25 knots (37–46 km/h) vs road
+// cruising at ~80–100 km/h, plus embarkation / wait time. A representative
+// effective door-to-door factor of 1.275 (27.5% extra budget consumed)
+// sits within the plausible 25–30% range. Adjust per crossing if desired.
+// ═══════════════════════════════════════════════════════════════════
+
+C.CELL_WATER    = 0;
+C.CELL_LAND     = 1;
+C.CELL_CROSSING = 2;
+
+// Distance budget multiplier for a crossing cell step.
+// 1.275 → a 50 km ferry crossing costs 63.75 km of travel budget.
+C.CROSSING_DISTANCE_FACTOR = 1.275;
+
+// Crossing zone definitions.
+// Format: [name, minLat, maxLat, minLng, maxLng]
+//
+// Bounds are deliberately conservative — only the narrowest navigable
+// corridor is marked, so vectors heading into open ocean are not misled
+// into thinking they can cross.
+//
+// Sources:
+//   DFDS, Stena Line, P&O Ferries route maps (2023)
+//   Øresund Bridge / Great Belt Bridge infrastructure documentation
+//   Fehmarn Belt Fixed Link planning documents (Femern A/S)
+//   Google Maps geometry for strait widths
+C.CROSSING_ZONES = [
+  // ── English Channel ──────────────────────────────────────────────
+  // Covers Dover Strait + Channel Tunnel corridor + main ferry routes
+  // (Dover–Calais, Dover–Dunkirk, Folkestone–Coquelles,
+  //  Newhaven–Dieppe, Portsmouth–Caen/Cherbourg, Poole–Cherbourg).
+  // Lat range stops at 50.0 to exclude the wider Atlantic approaches
+  // and at 51.5 to stay within the viable crossing band.
+  ['English Channel',        50.0,  51.5,  -2.0,   2.5],
+
+  // ── Øresund Strait (Copenhagen ↔ Malmö) ──────────────────────────
+  // Øresund Bridge + HH Ferry (Helsingør–Helsingborg).
+  // Strait is 4–28 km wide in this corridor.
+  ['Øresund',                55.5,  56.1,  12.5,  13.1],
+
+  // ── Great Belt (Storebælt, Denmark internal) ──────────────────────
+  // Great Belt Fixed Link (road + rail bridge/tunnel).
+  // The only practical car crossing between Funen and Zealand.
+  ['Great Belt',             55.1,  55.6,  10.7,  11.3],
+
+  // ── Fehmarn Belt (Germany ↔ Denmark) ─────────────────────────────
+  // Puttgarden–Rødby ferry (planned Fehmarn Belt Fixed Link).
+  // ~18 km crossing.
+  ['Fehmarn Belt',           54.4,  54.95, 10.8,  11.5],
+
+  // ── Irish Sea — northern corridor (Scotland/N.Ireland ↔ NI) ──────
+  // Cairnryan–Belfast (Stena / P&O), Troon–Larne.
+  ['Irish Sea North',        54.65, 55.25, -6.1,  -4.7],
+
+  // ── Irish Sea — central corridor (Wales ↔ Dublin) ────────────────
+  // Holyhead–Dublin (Irish Ferries / Stena), Liverpool–Dublin.
+  ['Irish Sea Central',      53.1,  53.55, -6.5,  -4.4],
+
+  // ── Irish Sea — southern corridor (Wales ↔ Rosslare) ─────────────
+  // Fishguard–Rosslare (Stena), Pembroke–Rosslare (Irish Ferries).
+  ['Irish Sea South',        51.7,  52.25, -5.3,  -4.6],
+
+  // ── Strait of Messina (mainland Italy ↔ Sicily) ──────────────────
+  // Regular car ferries; ~3 km crossing, very frequent.
+  ['Strait of Messina',      37.8,  38.5,  15.3,  15.75],
+
+  // ── Strait of Gibraltar ──────────────────────────────────────────
+  // Algeciras–Ceuta (Spain ↔ Spanish territory).
+  // Included for completeness; vectors rarely reach this far south.
+  ['Strait of Gibraltar',    35.8,  36.2,  -5.5,  -5.2],
+];
+
+
+// ═══════════════════════════════════════════════════════════════════
+// 4. LAND GRID
+// ═══════════════════════════════════════════════════════════════════
+
+// Grid bounding box = outer radius × (1 + GRID_MARGIN_FACTOR) on each side.
+// 0.2 = 20% padding so vectors grazing the far edge still get correct land checks.
 C.GRID_MARGIN_FACTOR = 0.2;
 
-// Adaptive grid size: cells = clamp(radius / DIVISOR, MIN, MAX).
-// Divisor: larger = fewer cells for a given radius (coarser, faster).
+// Adaptive grid cell count = clamp(outerKm / DIVISOR, MIN, MAX).
+// Larger divisor → coarser grid (faster, less detail).
+// At 900 km and divisor 10 → N = 90 cells.
 C.GRID_SIZE_DIVISOR = 10;
 
-// Minimum grid dimension (NxN cells).
-// Never go below this — very short ranges (walking 1h) still need enough
-// cells to detect water bodies like rivers or harbours.
-C.GRID_SIZE_MIN = 20;
+// Minimum grid dimension. Never go below this even for short walk/run ranges.
+// Ensures lakes and sea inlets are still detected at close range.
+C.GRID_SIZE_MIN = 40;
 
-// Maximum grid dimension.
-// 90×90 = 8 100 point-in-polygon tests. Beyond this, startup time grows
-// noticeably. At 1000 km radius and N=90, spacing ≈ 26 km — enough to
-// resolve the English Channel (34 km at narrowest point).
+// Maximum grid dimension. 90×90 = 8 100 point-in-polygon tests.
+// At 1000 km radius and N=90, cell spacing ≈ 26 km — enough to resolve
+// the English Channel (34 km at narrowest) and the Øresund (4 km narrowest
+// is below this resolution, but the crossing zone classification compensates).
 C.GRID_SIZE_MAX = 90;
 
-// Radius of each land grid dot drawn on the map (pixels).
-C.GRID_DOT_RADIUS = 3;
+// Pixel radius of the land grid dots drawn on the map.
+C.GRID_DOT_RADIUS = 2;
 
 
 // ═══════════════════════════════════════════════════════════════════
-// 3. TORTUOSITY
+// 5. TORTUOSITY
 // ═══════════════════════════════════════════════════════════════════
 
 /**
@@ -86,23 +207,18 @@ C.GRID_DOT_RADIUS = 3;
  *
  * Sources (peer-reviewed, scientific consensus):
  *   Ballou et al. (2002) "Road Tortuosity and Transport Cost"
- *     Transportation Research Part E, 38(6), 461–484
+ *     Transportation Research Part E 38(6): 461–484
  *   Boscoe et al. (2012) "A nationwide comparison of driving distance
  *     versus straight-line distance to hospitals"
- *     International Journal of Health Geographics, 11:3
+ *     International Journal of Health Geographics 11:3
  *   Weiß et al. (2018) "Global road accessibility" PLOS ONE 13(3)
- *   EEA CORINE Land Cover + SRTM elevation cross-analysis (2018)
- *
- *   flat     (<50 m per 10 km) : 1.00  — near-straight, minimal relief
- *   rolling  (50–200 m)        : 1.08  — gentle curves around low hills
- *   hilly    (200–500 m)       : 1.22  — valley crossings, ridge detours
- *   mountain (>500 m)          : 1.45  — switchbacks, alpine passes
+ *   EEA CORINE Land Cover + SRTM 90m elevation cross-analysis (2018)
  */
 C.TERRAIN_TORTUOSITY = {
-  flat:     1.00,
-  rolling:  1.08,
-  hilly:    1.22,
-  mountain: 1.45
+  flat:     1.00,   // <50 m per 10 km  — near-straight roads
+  rolling:  1.08,   // 50–200 m         — gentle curves around low hills
+  hilly:    1.22,   // 200–500 m        — valley crossings, ridge detours
+  mountain: 1.45    // >500 m           — switchbacks, alpine passes
 };
 
 /**
@@ -110,43 +226,34 @@ C.TERRAIN_TORTUOSITY = {
  *
  * Sources:
  *   Giacomin & Levinson (2015) "Road network circuity in metropolitan areas"
- *     Environment and Planning B: Planning and Design, 42(6), 1040–1055
+ *     Environment and Planning B 42(6): 1040–1055
  *     → vehicle circuity ≈ 1.21 across US metro areas
  *   Millward et al. (2013) "Active-transport walking behavior"
- *     Journal of Transport Geography, 30, 27–35
+ *     Journal of Transport Geography 30: 27–35
  *     → pedestrian circuity ≈ 1.05–1.10
- *
- *   walk/run : 1.05  — can use any path, alley, or open land
- *   cycle    : 1.08  — paths + roads; can cut some corners
- *   moto     : 1.15  — road-constrained but filters traffic better
- *   drive    : 1.20  — fully road-constrained
  */
 C.MODE_TORTUOSITY = {
-  walk:  1.05,
-  run:   1.05,
-  cycle: 1.08,
-  moto:  1.15,
-  drive: 1.20
+  walk:  1.05,   // can use any path, alley, open land
+  run:   1.05,   // same as walk
+  cycle: 1.08,   // roads + paths; some cross-country possible
+  moto:  1.15,   // road-constrained, better traffic filtering
+  drive: 1.20    // fully road-constrained
 };
 
 
 // ═══════════════════════════════════════════════════════════════════
-// 4. MODE DEFINITIONS
+// 6. MODE DEFINITIONS
 // ═══════════════════════════════════════════════════════════════════
 
 /**
  * Base travel speeds (km/h) per mode.
  *
- * Car / Moto: 115 km/h chosen by back-calibration against real journeys:
- *   Rosmalen → Mulhouse  6h: crow-flies 530 km → effective 88 km/h
- *   Rosmalen → Salzburg  9h: crow-flies 850 km → effective 94 km/h
- *   Rosmalen → Pisa     13h: crow-flies 1100 km → effective 85 km/h
- *   Average ≈ 89 km/h crow-flies.
- *   115 km/h ÷ τ_mode(1.20) ÷ τ_terrain(rolling 1.08) = 88.7 km/h ✓
- *
- * Cycle: 18 km/h — typical recreational / mixed-terrain average.
- * Run:   10 km/h — comfortable recreational pace.
- * Walk:   5 km/h — standard adult walking speed (well-established).
+ * Car / Moto calibrated by back-solving against three real journeys:
+ *   Rosmalen → Mulhouse   6 h  crow-flies ~530 km → effective 88.3 km/h
+ *   Rosmalen → Salzburg   9 h  crow-flies ~850 km → effective 94.4 km/h
+ *   Rosmalen → Pisa      13 h  crow-flies ~1100 km → effective 84.6 km/h
+ *   Mean effective ≈ 89 km/h crow-flies
+ *   115 ÷ (τ_mode 1.20 × τ_terrain 1.08) = 88.7 km/h ✓
  */
 C.MODE_SPEED_KMH = {
   drive: 115,
@@ -156,10 +263,10 @@ C.MODE_SPEED_KMH = {
   walk:    5
 };
 
-// Human-readable tooltip shown under the mode buttons in the sidebar.
+// Tooltip text shown under the mode buttons in the sidebar.
 C.MODE_NOTE = {
   drive: '115 km/h base · τ_mode 1.20 (Giacomin & Levinson 2015)',
-  moto:  '115 km/h base · τ_mode 1.15 — filters traffic better than car',
+  moto:  '115 km/h base · τ_mode 1.15 — filters traffic, handles passes better',
   cycle: '18 km/h base · τ_mode 1.08 (Millward et al. 2013)',
   run:   '10 km/h base · τ_mode 1.05 — open land accessible',
   walk:  '5 km/h base · τ_mode 1.05 — open land accessible'
@@ -167,29 +274,23 @@ C.MODE_NOTE = {
 
 
 // ═══════════════════════════════════════════════════════════════════
-// 5. COUNTRY DATABASE
+// 7. COUNTRY DATABASE
 // ═══════════════════════════════════════════════════════════════════
 
-/**
- * Highway speed reference used for country-speed scaling.
- * 130 km/h = most common European statutory limit.
- * Germany uses this as an advisory (Richtgeschwindigkeit);
- * it has no statutory motorway limit.
- */
+// Reference highway limit used for the per-destination country speed scaling.
+// 130 km/h = most common European statutory limit.
 C.HIGHWAY_REFERENCE_KMH = 130;
 
 /**
- * European country bounding boxes + statutory highway speed limits + default terrain.
- *
+ * European country bounding boxes, highway limits, and default terrain.
  * Format: [name, minLat, maxLat, minLng, maxLng, highwayKmh, defaultTerrain]
  *
  * Speed limits: EUR-Lex vehicle directives + national road authority publications.
- * UK: 70 mph = 112.65 → rounded to 112.
- * Germany: advisory 130 km/h, no statutory limit.
+ * UK: 70 mph = 112.65 → 112.
+ * Germany: advisory 130 km/h (Richtgeschwindigkeit); no statutory limit.
  *
- * Default terrain is a generalised classification derived from:
- *   SRTM 90m elevation data summaries (CGIAR-CSI)
- *   EEA CORINE Land Cover reports (2018)
+ * Default terrain: generalised from SRTM 90m elevation summaries (CGIAR-CSI)
+ * and EEA CORINE Land Cover reports (2018).
  */
 C.COUNTRY_DB = [
   // [name,            minLat, maxLat,  minLng, maxLng, highway, terrain]
@@ -238,28 +339,31 @@ C.COUNTRY_DB = [
 
 
 // ═══════════════════════════════════════════════════════════════════
-// 6. EXTERNAL DATA SOURCES
+// 8. EXTERNAL DATA SOURCES + GEOCODING
 // ═══════════════════════════════════════════════════════════════════
 
 // Natural Earth 110m land polygons via world-atlas (jsDelivr CDN).
-// Cached in the worker after first load — ~400 KB download, one time only.
+// ~400 KB download, cached in the worker after first use.
 C.LAND_DATA_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/land-110m.json';
 
-// Nominatim geocoding base URL.
+// Nominatim base URL for geocoding requests.
 C.NOMINATIM_URL = 'https://nominatim.openstreetmap.org';
 
-// Maximum number of address suggestions shown in the sidebar.
+// Maximum address suggestions shown in the sidebar dropdown.
 C.GEOCODE_MAX_RESULTS = 3;
 
-// Debounce delay (ms) between keystrokes and a Nominatim search request.
-// 1200 ms avoids hammering the API mid-word.
+// Debounce delay (ms) between keystrokes and a Nominatim search.
+// 1200 ms avoids hammering the API while the user is still typing.
 C.GEOCODE_DEBOUNCE_MS = 1200;
 
-// Maximum distance (metres) between a map click and a reverse-geocoded address
-// for the address to be shown instead of raw lat/lng.
+// A reverse-geocoded address is shown only if the returned point is within
+// this many metres of the map click. Beyond this, raw lat/lng is shown instead.
 // 25 m covers pavement-width imprecision without attributing a wrong address.
 C.REVERSE_GEOCODE_MAX_DISTANCE_M = 25;
 
-// Expose on global scope so both <script> tags and importScripts() can access C.
-// In a browser window `self === window`; in a Worker `self` is the worker global.
+
+// ── Expose globally ───────────────────────────────────────────────
+// In a browser tab: self === window, so C becomes window.C.
+// In a Web Worker:  self is the worker global scope.
+// Either way, C.* is available without any import/export machinery.
 self.C = C;
