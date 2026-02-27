@@ -20,7 +20,7 @@
     html, body { height: 100%; font-family: 'Source Sans 3', sans-serif; font-size: 14px; color: var(--tx); overflow: hidden; }
     #map { position: absolute; inset: 0; z-index: 0; }
 
-    /* ── Sidebar (desktop) ── */
+    /* Sidebar (desktop) */
     #sidebar {
       position: absolute; top: 0; left: 0; width: 300px; height: 100%;
       background: var(--bg); border-right: 1px solid var(--bd); z-index: 1000;
@@ -40,7 +40,7 @@
     .lbl { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--mt); }
     hr.dv { border: none; border-top: 1px solid var(--bd); }
 
-    /* ── Location ── */
+    /* Location */
     #loc {
       width: 100%; padding: 8px 10px; border: 1px solid var(--bd); border-radius: var(--r);
       background: var(--wh); font-family: inherit; font-size: 14px; color: var(--tx);
@@ -55,7 +55,7 @@
     .si .sm { font-weight: 600; }
     .si .ss { font-size: 11.5px; color: var(--mt); margin-top: 1px; }
 
-    /* ── Mode buttons ── */
+    /* Mode buttons */
     .mr { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
     .mt { position: relative; }
     .mt::after {
@@ -81,7 +81,7 @@
     .mb.active { background: var(--ac); border-color: var(--ac); color: #fff; }
     .sn { font-size: 11px; color: var(--mt); line-height: 1.5; }
 
-    /* ── Context panel ── */
+    /* Context panel */
     #ctx { display: none; flex-direction: column; gap: 7px; }
     #ctx.vis { display: flex; }
     .cr  { display: flex; align-items: center; gap: 6px; }
@@ -94,7 +94,7 @@
     .ft td:last-child { text-align: right; font-weight: 600; color: var(--tx); }
     .ft .hi { color: var(--ac); font-weight: 700; }
 
-    /* ── Toggle ── */
+    /* Toggle */
     .tgr { display: flex; align-items: center; gap: 8px; font-size: 12.5px; user-select: none; cursor: pointer; }
     .tgs { position: relative; width: 32px; height: 17px; flex-shrink: 0; }
     .tgs input { opacity: 0; width: 0; height: 0; }
@@ -103,7 +103,7 @@
     .tgs input:checked + .tgt { background: var(--ac); }
     .tgs input:checked + .tgt::after { transform: translateX(15px); }
 
-    /* ── Time / Distance inputs ── */
+    /* Time / Distance inputs */
     #tp, #dp { display: flex; flex-direction: column; gap: 5px; }
     #dp { display: none; }
     .hr, .dr { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -116,19 +116,19 @@
     .hu { font-size: 12px; color: var(--mt); }
     input[type="range"] { width: 100%; accent-color: var(--ac); cursor: pointer; }
 
-    /* ── Options row ── */
+    /* Options row */
     .opts-row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--mt); }
     .opts-row input[type="checkbox"] { accent-color: var(--ac); cursor: pointer; }
     .opts-row label { cursor: pointer; }
 
-    /* ── Status / progress ── */
+    /* Status / progress */
     #status-area { display: none; flex-direction: column; gap: 6px; }
     #status-area.vis { display: flex; }
     #status-msg { font-size: 12.5px; color: var(--ac); }
     #progress-bar-wrap { height: 4px; background: var(--bd); border-radius: 2px; overflow: hidden; }
     #progress-bar { height: 100%; width: 0%; background: var(--ac); transition: width .2s; border-radius: 2px; }
 
-    /* ── Buttons ── */
+    /* Buttons */
     #calc {
       width: 100%; padding: 10px; background: var(--ac); color: #fff; border: none; border-radius: var(--r);
       font-family: inherit; font-size: 14px; font-weight: 700; letter-spacing: .02em; cursor: pointer;
@@ -144,12 +144,12 @@
     }
     #clr:hover { border-color: #c0392b; color: #c0392b; }
 
-    /* ── Info card ── */
+    /* Info card */
     #ic { background: var(--wh); border: 1px solid var(--bd); border-radius: var(--r); padding: 10px 11px; font-size: 12.5px; line-height: 1.6; display: none; }
     #ic .icr { font-size: 16px; font-weight: 700; color: var(--ac); }
     #ic .ics { color: var(--mt); font-size: 11px; margin-top: 5px; line-height: 1.55; }
 
-    /* ── Legend ── */
+    /* Legend */
     #leg { display: none; flex-direction: column; gap: 7px; }
     #leg.vis { display: flex; }
     .li  { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
@@ -159,7 +159,7 @@
     .lg  { background: rgba(40,160,80,.3); border: 1.5px solid #28a050; }
     .lx  { background: rgba(224,128,32,.35); border: 1.5px solid #e08020; }
 
-    /* ── Numbered endpoint markers ── */
+    /* Numbered endpoint markers */
     .ep-marker {
       background: white; border: 1.5px solid #0078a8; border-radius: 50%;
       width: 18px; height: 18px; display: flex; align-items: center; justify-content: center;
@@ -169,7 +169,7 @@
 
     .leaflet-control-attribution { font-family: 'Source Sans 3', sans-serif; font-size: 10px; }
 
-    /* ── Mobile-only handle strip (hidden on desktop) ── */
+    /* Mobile-only handle strip (hidden on desktop) */
     #sheet-top { display: none; }
 
 
@@ -286,7 +286,7 @@
   <!-- Desktop header (hidden on mobile) -->
   <div id="hdr">
     <h1>Range Finder</h1>
-    <p>Compute a land-aware reachable area using vector walking. No routing API required.</p>
+    <p>Find out how far you can travel without routing API.</p>
   </div>
 
   <div id="body">
@@ -417,10 +417,10 @@
 
     <!-- Options -->
     <div class="opts-row">
-      <input type="checkbox" id="show-grid" checked>
+      <input type="checkbox" id="show-grid" unchecked>
       <label for="show-grid">Show land grid</label>
       &nbsp;
-      <input type="checkbox" id="show-pts" checked>
+      <input type="checkbox" id="show-pts" unchecked>
       <label for="show-pts">Show endpoints</label>
     </div>
 
