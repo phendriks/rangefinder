@@ -16,7 +16,7 @@ C.DISTANCE_UNITS			= 'kilometers';
 C.EXTRACTION_STEPS_DIVISOR	= 120;
 
 // Ferry/bridge crossings consume more budget to model slower effective speed.
-C.CROSSING_DISTANCE_FACTOR = 1.275;
+C.CROSSING_DISTANCE_FACTOR = 1.5;
 
 // Crossing zones as bounding boxes: [name, minLat, maxLat, minLng, maxLng]
 C.CROSSING_ZONES = [
