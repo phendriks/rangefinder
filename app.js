@@ -72,6 +72,36 @@ let searchTimer = null;
 let lastQuery = '';
 
 
+const debugToggle = document.getElementById('dbg');
+
+let debugEnabled = debugToggle ? debugToggle.checked : false;
+
+function applyDebugVisibility() {
+	const ctxEl = document.getElementById('ctx');
+	const icEl = document.getElementById('ic');
+
+	if (ctxEl) ctxEl.style.display = debugEnabled ? '' : 'none';
+
+	if (!icEl) return;
+
+	if (!debugEnabled) {
+		icEl.style.display = 'none';
+		return;
+	}
+
+	icEl.style.display = icEl.innerHTML.trim() ? 'block' : 'none';
+}
+
+if (debugToggle) {
+	debugToggle.addEventListener('change', function () {
+		debugEnabled = this.checked;
+		applyDebugVisibility();
+	});
+}
+
+applyDebugVisibility();
+
+
 // Mobile bottom sheet
 
 (function () {
@@ -165,6 +195,7 @@ function showCtx(country, terrainOverride) {
 		}
 
 		updateTable();
+		applyDebugVisibility();
 }
 
 
@@ -610,6 +641,7 @@ function renderResults(workerResult, meta, legOTxt, legITxt) {
 						<b>Shape:</b> ${C.VECTOR_COUNT} vectors · ${C.VECTOR_STEP_DEG}° apart · max redirect ${C.REDIRECT_ANGLE_MAX}°<br>
 						Inner radius: ~${fmt(meta.innerKm)} km
 				</div>`;
+		applyDebugVisibility();
 
 		document.getElementById('lo-lbl').textContent = legOTxt;
 		document.getElementById('in-lbl').textContent = legITxt;
@@ -643,6 +675,8 @@ function clearOverlay(resetUI = true) {
 				document.getElementById('status-area').classList.remove('vis');
 				document.getElementById('calc').disabled = false;
 		}
+		
+		applyDebugVisibility();
 }
 
 document.getElementById('clr').addEventListener('click', () => {
