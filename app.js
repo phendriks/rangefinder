@@ -1,30 +1,10 @@
-/**
- * app.js — Range Finder main application
- *
- * All tuneable values live in constants.js (C.*).
- *
- * Responsibilities:
- *  - Leaflet map setup and tile layer
- *  - Mode / terrain / time / distance UI and sliders
- *  - Nominatim geocoding (forward + reverse)
- *  - Spawning range-worker.js and routing its messages
- *  - Rendering land grid dots, numbered endpoint markers, range polygons
- */
-
 'use strict';
 
-// C is loaded via <script src="constants.js"> in index.html before this file.
+// C is loaded via <script src="constants.js"> before this file.
 
 
-// ═══════════════════════════════════════════════════════════════════
-// HELPERS — country lookup
-// ═══════════════════════════════════════════════════════════════════
+// -- Country lookup --
 
-/**
- * Return the smallest bounding box in C.COUNTRY_DB that contains (lat, lng),
- * or null if the point is outside all known countries.
- * Smallest box = most specific (avoids large countries swallowing small neighbours).
- */
 function countryAt(lat, lng) {
   const hits = C.COUNTRY_DB.filter(
     c => lat >= c[1] && lat <= c[2] && lng >= c[3] && lng <= c[4]
@@ -35,14 +15,11 @@ function countryAt(lat, lng) {
 }
 
 
-// ═══════════════════════════════════════════════════════════════════
-// MAP
-// ═══════════════════════════════════════════════════════════════════
+// -- Map setup --
 
 const map = L.map('map', { center: [48, 10], zoom: 5, zoomControl: false });
 L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-// Canvas renderer for the land grid — much faster than SVG for hundreds of dots
 const canvasRenderer = L.canvas({ padding: 0.5 });
 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -54,25 +31,21 @@ document.getElementById('map').style.marginLeft = '300px';
 map.invalidateSize();
 
 
-// ═══════════════════════════════════════════════════════════════════
-// STATE
-// ═══════════════════════════════════════════════════════════════════
+// -- State --
 
-let coords        = null;  // { lat, lng } of current pin
-let pin           = null;  // Leaflet Marker for the start pin
-let mapLayers     = [];    // polygon / GeoJSON layers (cleared between runs)
-let gridMarkers   = [];    // land grid circle markers
-let epMarkers     = [];    // numbered endpoint markers
-let useDist       = false; // false = time mode, true = distance mode
+let coords        = null;
+let pin           = null;
+let mapLayers     = [];
+let gridMarkers   = [];
+let epMarkers     = [];
+let useDist       = false;
 let activeModeKey = 'drive';
-let worker        = null;  // active Web Worker instance (or null)
-let searchTimer   = null;  // geocode debounce timer ID
-let lastQuery     = '';    // last query sent to Nominatim
+let worker        = null;
+let searchTimer   = null;
+let lastQuery     = '';
 
 
-// ═══════════════════════════════════════════════════════════════════
-// MODE BUTTONS
-// ═══════════════════════════════════════════════════════════════════
+// -- Mode buttons --
 
 document.querySelectorAll('.mb').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -86,9 +59,7 @@ document.querySelectorAll('.mb').forEach(btn => {
 });
 
 
-// ═══════════════════════════════════════════════════════════════════
-// CONTEXT PANEL — terrain dropdown + factor table
-// ═══════════════════════════════════════════════════════════════════
+// -- Context panel --
 
 document.getElementById('ctx-terrain').addEventListener('change', () => {
   updateTable();
@@ -96,11 +67,11 @@ document.getElementById('ctx-terrain').addEventListener('change', () => {
 });
 
 function updateTable() {
-  const speed   = C.MODE_SPEED_KMH[activeModeKey];
-  const modeTau = C.MODE_TORTUOSITY[activeModeKey];
-  const terrTau = C.TERRAIN_TORTUOSITY[document.getElementById('ctx-terrain').value];
-  const total   = +(modeTau * terrTau).toFixed(3);
-  const effSpd  = +(speed / total).toFixed(1);
+  const speed    = C.MODE_SPEED_KMH[activeModeKey];
+  const modeTau  = C.MODE_TORTUOSITY[activeModeKey];
+  const terrTau  = C.TERRAIN_TORTUOSITY[document.getElementById('ctx-terrain').value];
+  const total    = +(modeTau * terrTau).toFixed(3);
+  const effSpd   = +(speed / total).toFixed(1);
 
   document.getElementById('ft-m').textContent   = modeTau.toFixed(2);
   document.getElementById('ft-t').textContent   = terrTau.toFixed(2);
@@ -119,17 +90,12 @@ function showCtx(country, terrainOverride) {
     document.getElementById('ctx-limit').textContent   = '';
   }
 
-  if (terrainOverride) {
-    document.getElementById('ctx-terrain').value = terrainOverride;
-  }
-
+  if (terrainOverride) document.getElementById('ctx-terrain').value = terrainOverride;
   updateTable();
 }
 
 
-// ═══════════════════════════════════════════════════════════════════
-// SLIDERS — time
-// ═══════════════════════════════════════════════════════════════════
+// -- Sliders (time) --
 
 const mih = document.getElementById('mih'), mah = document.getElementById('mah');
 const mis = document.getElementById('mis'), mas = document.getElementById('mas');
@@ -143,9 +109,7 @@ mah.addEventListener('change', e => sMax(e.target.value));
 mas.addEventListener('input',  e => sMax(e.target.value));
 
 
-// ═══════════════════════════════════════════════════════════════════
-// SLIDERS — distance
-// ═══════════════════════════════════════════════════════════════════
+// -- Sliders (distance) --
 
 const mid  = document.getElementById('mid'),  mad  = document.getElementById('mad');
 const mids = document.getElementById('mids'), mads = document.getElementById('mads');
@@ -159,14 +123,12 @@ mad.addEventListener('change',  e => sdMax(e.target.value));
 mads.addEventListener('input',  e => sdMax(e.target.value));
 
 
-// ═══════════════════════════════════════════════════════════════════
-// TOGGLE — time vs distance
-// ═══════════════════════════════════════════════════════════════════
+// -- Time / distance toggle --
 
 document.getElementById('dtg').addEventListener('change', function () {
   useDist = this.checked;
-  document.getElementById('tp').style.display = useDist ? 'none'  : 'flex';
-  document.getElementById('dp').style.display = useDist ? 'flex'  : 'none';
+  document.getElementById('tp').style.display = useDist ? 'none' : 'flex';
+  document.getElementById('dp').style.display = useDist ? 'flex' : 'none';
   document.getElementById('lt').style.cssText = useDist
     ? 'color:var(--mt)'
     : 'font-weight:600;color:var(--tx)';
@@ -176,14 +138,11 @@ document.getElementById('dtg').addEventListener('change', function () {
   clearOverlay();
 });
 
-// Set initial state
 document.getElementById('tp').style.display = 'flex';
 document.getElementById('dp').style.display = 'none';
 
 
-// ═══════════════════════════════════════════════════════════════════
-// VISIBILITY TOGGLES — grid dots + endpoint markers
-// ═══════════════════════════════════════════════════════════════════
+// -- Visibility toggles --
 
 document.getElementById('show-grid').addEventListener('change', function () {
   gridMarkers.forEach(m => this.checked ? map.addLayer(m) : map.removeLayer(m));
@@ -194,9 +153,7 @@ document.getElementById('show-pts').addEventListener('change', function () {
 });
 
 
-// ═══════════════════════════════════════════════════════════════════
-// GEOCODING — Nominatim, debounce from C.GEOCODE_DEBOUNCE_MS
-// ═══════════════════════════════════════════════════════════════════
+// -- Geocoding --
 
 const locEl = document.getElementById('loc');
 const sugEl = document.getElementById('sug');
@@ -221,7 +178,7 @@ async function doSearch(q) {
       headers: { 'Accept-Language': 'en', 'User-Agent': 'RangeFinderApp/1.0' }
     }).then(r => r.json());
 
-    if (locEl.value.trim() !== q) return; // stale — user typed more
+    if (locEl.value.trim() !== q) return;
     renderSug(data);
   } catch { hideSug(); }
 }
@@ -256,9 +213,7 @@ function esc(s) {
 }
 
 
-// ═══════════════════════════════════════════════════════════════════
-// MAP CLICK — reverse geocode with C.REVERSE_GEOCODE_MAX_DISTANCE_M threshold
-// ═══════════════════════════════════════════════════════════════════
+// -- Map click / reverse geocode --
 
 map.on('click', async e => {
   const { lat, lng } = e.latlng;
@@ -267,19 +222,14 @@ map.on('click', async e => {
   hideSug();
 
   try {
-    const url  = `${C.NOMINATIM_URL}/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`;
-    const d    = await fetch(url, {
+    const url = `${C.NOMINATIM_URL}/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`;
+    const d   = await fetch(url, {
       headers: { 'Accept-Language': 'en', 'User-Agent': 'RangeFinderApp/1.0' }
     }).then(r => r.json());
 
     if (!d?.lat) return;
 
-    const dist = turf.distance(
-      turf.point([lng, lat]),
-      turf.point([+d.lon, +d.lat]),
-      { units: 'meters' }
-    );
-
+    const dist = turf.distance(turf.point([lng, lat]), turf.point([+d.lon, +d.lat]), { units: 'meters' });
     if (dist <= C.REVERSE_GEOCODE_MAX_DISTANCE_M && d.display_name) {
       locEl.value = d.display_name; lastQuery = d.display_name;
     }
@@ -294,9 +244,7 @@ function applyAddress(lat, lng) {
 }
 
 
-// ═══════════════════════════════════════════════════════════════════
-// PIN
-// ═══════════════════════════════════════════════════════════════════
+// -- Pin --
 
 function placePin(lat, lng) {
   coords = { lat, lng };
@@ -306,9 +254,7 @@ function placePin(lat, lng) {
 }
 
 
-// ═══════════════════════════════════════════════════════════════════
-// CALCULATE — spawn (or restart) the Web Worker
-// ═══════════════════════════════════════════════════════════════════
+// -- Calculate --
 
 document.getElementById('calc').addEventListener('click', () => {
   if (!coords) { alert('Please select a starting location first.'); return; }
@@ -325,61 +271,56 @@ document.getElementById('calc').addEventListener('click', () => {
 
   if (!useDist) {
     const minH = +mih.value, maxH = +mah.value;
-    outerKm = effSpd * maxH;
-    innerKm = effSpd * minH;
-    legOTxt = `Outer: ~${fmt(outerKm)} km (${maxH} hr)`;
-    legITxt = `Inner: ~${fmt(innerKm)} km (${minH} hr)`;
+    outerKm  = effSpd * maxH;
+    innerKm  = effSpd * minH;
+    legOTxt  = `Outer: ~${fmt(outerKm)} km (${maxH} hr)`;
+    legITxt  = `Inner: ~${fmt(innerKm)} km (${minH} hr)`;
   } else {
     const minD = +mid.value, maxD = +mad.value;
-    outerKm = maxD / total;
-    innerKm = minD / total;
-    legOTxt = `Outer: ~${fmt(outerKm)} km (${maxD} km road)`;
-    legITxt = `Inner: ~${fmt(innerKm)} km (${minD} km road)`;
+    outerKm  = maxD / total;
+    innerKm  = minD / total;
+    legOTxt  = `Outer: ~${fmt(outerKm)} km (${maxD} km road)`;
+    legITxt  = `Inner: ~${fmt(innerKm)} km (${minD} km road)`;
   }
 
   const meta = { effSpd, total, speed, modeTau, terrTau, outerKm, innerKm };
 
   clearOverlay(false);
 
-  // Show progress UI
-  document.getElementById('calc').disabled = true;
-  document.getElementById('status-area').classList.add('vis');
+  const calcBtn   = document.getElementById('calc');
+  const statusArea = document.getElementById('status-area');
+
+  calcBtn.disabled = true;
+  statusArea.classList.add('vis');
   setStatus('Initialising…', 0);
 
-  // Start worker
   worker = new Worker('range-worker.js');
+
+  function finishCalc() {
+    worker = null;
+    statusArea.classList.remove('vis');
+    calcBtn.disabled = false;
+  }
 
   worker.onmessage = function (evt) {
     const msg = evt.data;
     switch (msg.type) {
-      case 'status':
-        setStatus(msg.msg, null);
-        break;
-      case 'progress':
-        setStatus(`Walking vectors… ${msg.pct}%`, msg.pct);
-        break;
-      case 'grid':
-        renderGrid(msg.pts);
-        break;
+      case 'status':   setStatus(msg.msg, null); break;
+      case 'progress': setStatus(`Walking vectors… ${msg.pct}%`, msg.pct); break;
+      case 'grid':     renderGrid(msg.pts); break;
       case 'done':
-        worker = null;
-        document.getElementById('status-area').classList.remove('vis');
-        document.getElementById('calc').disabled = false;
+        finishCalc();
         renderResults(msg, meta, legOTxt, legITxt);
         break;
       case 'error':
-        worker = null;
-        document.getElementById('status-area').classList.remove('vis');
-        document.getElementById('calc').disabled = false;
+        finishCalc();
         alert(`Error: ${msg.msg}`);
         break;
     }
   };
 
   worker.onerror = function (e) {
-    worker = null;
-    document.getElementById('status-area').classList.remove('vis');
-    document.getElementById('calc').disabled = false;
+    finishCalc();
     alert(`Worker error: ${e.message}`);
   };
 
@@ -392,9 +333,7 @@ function setStatus(msg, pct) {
 }
 
 
-// ═══════════════════════════════════════════════════════════════════
-// RENDER — land grid dots
-// ═══════════════════════════════════════════════════════════════════
+// -- Render: land grid --
 
 function renderGrid(pts) {
   gridMarkers.forEach(m => map.removeLayer(m));
@@ -403,11 +342,11 @@ function renderGrid(pts) {
   const showGrid = document.getElementById('show-grid').checked;
 
   pts.forEach(p => {
-    const isCrossing = p.cell === C.CELL_CROSSING;
-    const colour     = isCrossing ? '#e08020' : '#28a050'; // orange = crossing, green = land
+    const crossing = p.cell === C.CELL_CROSSING;
+    const colour   = crossing ? '#e08020' : '#28a050';
     const m = L.circleMarker([p.lat, p.lng], {
       renderer:    canvasRenderer,
-      radius:      isCrossing ? C.GRID_DOT_RADIUS + 1 : C.GRID_DOT_RADIUS,
+      radius:      crossing ? C.GRID_DOT_RADIUS + 1 : C.GRID_DOT_RADIUS,
       color:       colour,
       fillColor:   colour,
       fillOpacity: 0.55,
@@ -419,26 +358,21 @@ function renderGrid(pts) {
 }
 
 
-// ═══════════════════════════════════════════════════════════════════
-// RENDER — polygons + numbered endpoint markers
-// ═══════════════════════════════════════════════════════════════════
+// -- Render: polygons + endpoint markers --
 
 function renderResults(workerResult, meta, legOTxt, legITxt) {
   const { outerRing, innerRing, outerGeo, innerGeo } = workerResult;
 
-  // Outer polygon (semi-transparent blue)
   const outerLayer = L.geoJSON(outerGeo, {
     style: { color: '#0078a8', weight: 2, opacity: 0.8, fillColor: '#0096cc', fillOpacity: 0.18 }
   }).addTo(map);
 
-  // Inner polygon (opaque fill — creates the donut effect)
   const innerLayer = L.geoJSON(innerGeo, {
     style: { color: '#0078a8', weight: 1.5, opacity: 0.6, dashArray: '5 5', fillColor: '#f0ede8', fillOpacity: 0.82 }
   }).addTo(map);
 
   mapLayers.push(outerLayer, innerLayer);
 
-  // Numbered endpoint markers on the outer ring
   epMarkers.forEach(m => map.removeLayer(m));
   epMarkers = [];
   const showPts = document.getElementById('show-pts').checked;
@@ -457,7 +391,6 @@ function renderResults(workerResult, meta, legOTxt, legITxt) {
 
   map.fitBounds(outerLayer.getBounds(), { padding: [40, 40] });
 
-  // Info card
   const { effSpd, total, speed, modeTau, terrTau, outerKm, innerKm } = meta;
   const terrain = document.getElementById('ctx-terrain').value;
   const ic = document.getElementById('ic');
@@ -478,9 +411,7 @@ function renderResults(workerResult, meta, legOTxt, legITxt) {
 }
 
 
-// ═══════════════════════════════════════════════════════════════════
-// CLEAR
-// ═══════════════════════════════════════════════════════════════════
+// -- Clear --
 
 function clearOverlay(resetUI = true) {
   if (worker) { worker.terminate(); worker = null; }
@@ -501,8 +432,6 @@ function clearOverlay(resetUI = true) {
 document.getElementById('clr').addEventListener('click', () => clearOverlay(true));
 
 
-// ═══════════════════════════════════════════════════════════════════
-// UTILITY
-// ═══════════════════════════════════════════════════════════════════
+// -- Utility --
 
 function fmt(n) { return Math.round(n).toLocaleString(); }
