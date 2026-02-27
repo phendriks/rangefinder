@@ -1,108 +1,81 @@
-'use strict';
-
 // constants.js — single source of truth for all tuneable values.
 // Loaded via script tag in the browser and importScripts() in the worker.
 
-const C = {};
+const C = {}; 
 
+C.VECTOR_COUNT				= 90;
+C.VECTOR_STEP_DEG			= 360 / C.VECTOR_COUNT;
 
-// Vectors
+C.CELL_WATER				= 0;
+C.CELL_LAND					= 1;
+C.CELL_CROSSING				= 2;
 
-C.VECTOR_COUNT = 90;
-C.VECTOR_STEP_DEG = 360 / C.VECTOR_COUNT;
-C.REDIRECT_ANGLE_MAX = 35;
+C.NEIGHBOR_MODE_8			= true;
+C.DISTANCE_UNITS			= 'kilometers';
 
+C.EXTRACTION_STEPS_DIVISOR	= 120;
 
-// Layout and UI
-
-C.MOBILE_BREAKPOINT_PX = 640;
-C.SIDEBAR_WIDTH_PX = 300;
-C.SHEET_TRANSITION_MS = 350;
-
-C.MAP_INITIAL_CENTER = [48, 10];
-C.MAP_INITIAL_ZOOM = 5;
-C.MAP_GEOCODE_ZOOM = 10;
-C.MAP_FIT_PADDING_PX = 40;
-
-
-// Cell types
-
-C.CELL_WATER = 0;
-C.CELL_LAND = 1;
-C.CELL_CROSSING = 2;
-
-
-// Propagation
-
-C.NEIGHBOR_MODE_8 = true;
-C.DISTANCE_UNITS = 'kilometers';
-C.EXTRACTION_STEPS_DIVISOR = 120;
-
-
-// Crossings
-
+// Ferry/bridge crossings consume more budget to model slower effective speed.
 C.CROSSING_DISTANCE_FACTOR = 1.275;
 
 // Crossing zones as bounding boxes: [name, minLat, maxLat, minLng, maxLng]
 C.CROSSING_ZONES = [
-	['English Channel',     50.0,  51.5,  -2.0,   2.5],
-	['Oresund',             55.5,  56.1,  12.5,  13.1],
-	['Great Belt',          55.1,  55.6,  10.7,  11.3],
-	['Fehmarn Belt',        54.4,  54.95, 10.8,  11.5],
-	['Irish Sea North',     54.65, 55.25, -6.1,  -4.7],
-	['Irish Sea Central',   53.1,  53.55, -6.5,  -4.4],
-	['Irish Sea South',     51.7,  52.25, -5.3,  -4.6],
-	['Strait of Messina',   37.8,  38.5,  15.3,  15.75],
-	['Strait of Gibraltar', 35.8,  36.2,  -5.5,  -5.2]
+	['English Channel',     50.0,  51.5,  -2.0,   2.5],  // Dover Strait + tunnel + main ferries
+	['Oresund',             55.5,  56.1,  12.5,  13.1],  // Copenhagen to Malmo bridge + HH ferry
+	['Great Belt',          55.1,  55.6,  10.7,  11.3],  // Funen to Zealand fixed link
+	['Fehmarn Belt',        54.4,  54.95, 10.8,  11.5],  // Puttgarden to Rodby ferry
+	['Irish Sea North',     54.65, 55.25, -6.1,  -4.7],  // Cairnryan to Belfast
+	['Irish Sea Central',   53.1,  53.55, -6.5,  -4.4],  // Holyhead to Dublin
+	['Irish Sea South',     51.7,  52.25, -5.3,  -4.6],  // Fishguard/Pembroke to Rosslare
+	['Strait of Messina',   37.8,  38.5,  15.3,  15.75], // mainland Italy to Sicily
+	['Strait of Gibraltar', 35.8,  36.2,  -5.5,  -5.2],  // Algeciras to Ceuta
 ];
 
-
 // Land grid
+C.GRID_MARGIN_FACTOR		= 0.2;   // padding around outer radius bounding box as a fraction
+C.GRID_SIZE_DIVISOR         = 10;    // N = clamp(outerKm / divisor, min, max)
+C.GRID_SIZE_MIN             = 20;
+C.GRID_SIZE_MAX             = 90;
 
-C.GRID_MARGIN_FACTOR = 0.2;
-C.GRID_SIZE_DIVISOR = 5;
-C.GRID_SIZE_MIN = 20;
-C.GRID_SIZE_MAX = 90;
-
-C.GRID_DOT_RADIUS = 2;
-
-
-// Tortuosity
-
+// Tortuosity: tau_terrain — road sinuosity added by elevation relief.
+// Values from Ballou 2002, Boscoe 2012, Weiss 2018 / EEA CORINE 2018.
 C.TERRAIN_TORTUOSITY = {
-	flat: 1.00,
-	rolling: 1.08,
-	hilly: 1.22,
-	mountain: 1.45
+	flat					: 1.00,  // under 50m per 10km, near-straight roads
+	rolling					: 1.08,  // 50 to 200m, gentle curves
+	hilly					: 1.22,  // 200 to 500m, valley crossings and ridge detours
+	mountain				: 1.45,  // over 500m, switchbacks and alpine passes
 };
 
+// Tortuosity: tau_mode — network constraint per mode.
+// Values from Giacomin & Levinson 2015, Millward et al 2013.
 C.MODE_TORTUOSITY = {
-	walk: 1.05,
-	run: 1.05,
+	walk:  1.05,
+	run:   1.05,
 	cycle: 1.08,
-	moto: 1.15,
-	drive: 1.20
+	moto:  1.15,
+	drive: 1.20,
 };
 
+// Base speeds calibrated against real drives: 115 / (1.20 * 1.08) = 88.7 km/h crow-flies.
 C.MODE_SPEED_KMH = {
 	drive: 115,
-	moto: 115,
-	cycle: 18,
-	run: 10,
-	walk: 5
+	moto:  115,
+	cycle:  18,
+	run:    10,
+	walk:    5,
 };
 
 C.MODE_NOTE = {
 	drive: '115 km/h base, tau_mode 1.20 (Giacomin & Levinson 2015)',
-	moto: '115 km/h base, tau_mode 1.15, filters traffic and handles mountain passes better',
+	moto:  '115 km/h base, tau_mode 1.15, filters traffic and handles mountain passes better',
 	cycle: '18 km/h base, tau_mode 1.08 (Millward et al. 2013)',
-	run: '10 km/h base, tau_mode 1.05, open land accessible',
-	walk: '5 km/h base, tau_mode 1.05, open land accessible'
+	run:   '10 km/h base, tau_mode 1.05, open land accessible',
+	walk:  '5 km/h base, tau_mode 1.05, open land accessible',
 };
 
-
 // Country database: [name, minLat, maxLat, minLng, maxLng, highwayKmh, defaultTerrain]
-
+// Speeds from EUR-Lex and national road authority publications.
+// Terrain generalised from SRTM 90m and EEA CORINE Land Cover 2018.
 C.COUNTRY_DB = [
 	['Albania',       39.6, 42.7,  19.2,  21.1,  110, 'hilly'],
 	['Austria',       46.4, 49.0,   9.5,  17.2,  130, 'hilly'],
@@ -144,28 +117,34 @@ C.COUNTRY_DB = [
 	['Switzerland',   45.8, 47.9,   5.9,  10.5,  120, 'mountain'],
 	['Turkey',        35.8, 42.1,  26.0,  44.8,  120, 'rolling'],
 	['Ukraine',       44.4, 52.4,  22.1,  40.2,  130, 'rolling'],
-	['UK',            49.9, 60.9,  -8.2,   2.0,  112, 'rolling']
+	['UK',            49.9, 60.9,  -8.2,   2.0,  112, 'rolling'],
 ];
-
 
 // External data and geocoding
 
-C.LAND_DATA_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/land-110m.json';
+C.LAND_DATA_URL  = 'https://cdn.jsdelivr.net/npm/world-atlas@2/land-110m.json';
+C.NOMINATIM_URL  = 'https://nominatim.openstreetmap.org';
+C.NOMINATIM_HEADERS = { 'Accept-Language': 'en', 'User-Agent': 'RangeFinderApp/1.0' };
 
-C.NOMINATIM_URL = 'https://nominatim.openstreetmap.org';
-C.NOMINATIM_HEADERS = {
-	'Accept-Language': 'en',
-	'User-Agent': 'RangeFinderApp/1.0'
-};
-
-C.GEOCODE_MAX_RESULTS = 3;
-C.GEOCODE_DEBOUNCE_MS = 1200;
-C.GEOCODE_MIN_QUERY_LENGTH = 3;
-
+C.GEOCODE_MAX_RESULTS            = 3;
+C.GEOCODE_DEBOUNCE_MS            = 1200;
+C.GEOCODE_MIN_QUERY_LENGTH       = 3;
 C.REVERSE_GEOCODE_MAX_DISTANCE_M = 25;
-C.REVERSE_GEOCODE_ZOOM = 18;
+C.REVERSE_GEOCODE_ZOOM           = 18;
 
+// Map and UI layout
+
+C.MAP_INITIAL_CENTER   = [48, 10];
+C.MAP_INITIAL_ZOOM     = 5;
+C.MAP_GEOCODE_ZOOM     = 10;   // zoom level used when flying to a geocoded result
+C.MAP_FIT_PADDING_PX   = 40;   // px padding passed to fitBounds
+C.MOBILE_BREAKPOINT_PX = 640;
+C.SIDEBAR_WIDTH_PX     = 300;
+C.SHEET_TRANSITION_MS  = 350;  // wait after CSS sheet animation before calling invalidateSize
+C.CANVAS_PADDING       = 0.5;  // Leaflet canvas renderer padding factor
+
+C.EP_MARKER_SIZE_PX  = 18;   // width and height of numbered endpoint markers
+C.EP_MARKER_Z_OFFSET = 100;  // zIndexOffset keeps endpoint markers above polygons
 
 // Expose as C on both window (browser) and global scope (worker)
-
 self.C = C;
