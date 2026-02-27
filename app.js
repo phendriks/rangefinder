@@ -132,10 +132,8 @@ applyDebugVisibility();
 						setSheet(true);
 				}
 		});
-
-		document.getElementById('calc').addEventListener('click', () => {
-				if (isMobile()) setSheet(false);
-		});
+		// Intentionally do not change sheet state on calc.
+		document.getElementById('calc').addEventListener('click', () => {});
 })();
 
 
@@ -675,7 +673,7 @@ function clearOverlay(resetUI = true) {
 				document.getElementById('status-area').classList.remove('vis');
 				document.getElementById('calc').disabled = false;
 		}
-		
+
 		applyDebugVisibility();
 }
 
@@ -683,6 +681,76 @@ document.getElementById('clr').addEventListener('click', () => {
 		clearOverlay(true);
 });
 
+function setActiveMode(modeKey) {
+	activeModeKey = modeKey;
+
+	document.querySelectorAll('.mb').forEach(b => {
+		b.classList.toggle('active', b.dataset.mode === modeKey);
+	});
+
+	const sn = document.getElementById('sn');
+	if (sn) sn.textContent = C.MODE_NOTE[activeModeKey];
+
+	updateTable();
+	clearOverlay();
+}
+
+function setTimeRangeHours(maxH) {
+	const minH = Math.max(0.5, Math.min(maxH - 0.5, maxH * 0.5));
+
+	setMinHours(minH);
+	setMaxHours(maxH);
+}
+
+function ensureTimeMode() {
+	const dtg = document.getElementById('dtg');
+	if (dtg && dtg.checked) {
+		dtg.checked = false;
+		dtg.dispatchEvent(new Event('change'));
+	}
+}
+
+(function setupMiniBar() {
+	const miniExpand = document.getElementById('mini-expand');
+	const miniMode = document.getElementById('mini-mode');
+	const miniRange = document.getElementById('mini-range');
+	const miniCalc = document.getElementById('mini-calc');
+
+	if (!miniExpand || !miniMode || !miniRange || !miniCalc) return;
+
+	miniMode.value = activeModeKey;
+
+	miniMode.addEventListener('change', function () {
+		setActiveMode(this.value);
+	});
+
+	miniRange.addEventListener('change', function () {
+		const v = String(this.value || '');
+
+		// For now: time presets only (t:1, t:2, ...)
+		// We keep your full UI to switch to distance mode when expanded.
+		if (v.startsWith('t:')) {
+			ensureTimeMode();
+			const hours = +v.slice(2);
+			setTimeRangeHours(hours);
+			clearOverlay();
+		}
+	});
+
+	miniCalc.addEventListener('click', () => {
+		document.getElementById('calc').click();
+	});
+
+	miniExpand.addEventListener('click', () => {
+		const sidebar = document.getElementById('sidebar');
+		if (!sidebar) return;
+
+		const collapsed = sidebar.classList.contains('sheet-collapsed');
+		sidebar.classList.toggle('sheet-collapsed', !collapsed);
+
+		setTimeout(() => map.invalidateSize(), C.SHEET_TRANSITION_MS);
+	});
+})();
 
 // Utility
 
