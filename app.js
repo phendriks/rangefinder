@@ -6,9 +6,7 @@
 // -- Country lookup --
 
 function countryAt(lat, lng) {
-  const hits = C.COUNTRY_DB.filter(
-    c => lat >= c[1] && lat <= c[2] && lng >= c[3] && lng <= c[4]
-  );
+  const hits = C.COUNTRY_DB.filter(c => lat >= c[1] && lat <= c[2] && lng >= c[3] && lng <= c[4]);
   if (!hits.length) return null;
   hits.sort((a, b) => ((a[2]-a[1]) * (a[4]-a[3])) - ((b[2]-b[1]) * (b[4]-b[3])));
   return { name: hits[0][0], highway: hits[0][5], terrain: hits[0][6] };
@@ -22,16 +20,22 @@ L.control.zoom({ position: 'bottomright' }).addTo(map);
 
 const canvasRenderer = L.canvas({ padding: 0.5 });
 
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  maxZoom: 19,
-  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-}).addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+  {maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}
+).addTo(map);
 
-document.getElementById('map').style.marginLeft = '300px';
+// Desktop: CSS already gives the map a 300px left margin via the sidebar width.
+// Mobile: CSS removes that margin; the bottom sheet overlays the full-screen map.
+const isMobile = () => window.innerWidth < 640;
+
+if (!isMobile()) {document.getElementById('map').style.marginLeft = '300px';}
 map.invalidateSize();
 
+// Recompute map margin if window is resized across the breakpoint
+window.addEventListener('resize', () => {document.getElementById('map').style.marginLeft = isMobile() ? '' : '300px';   map.invalidateSize();});
 
-// -- State --
+
+// State
 
 let coords        = null;
 let pin           = null;
@@ -45,7 +49,36 @@ let searchTimer   = null;
 let lastQuery     = '';
 
 
-// -- Mode buttons --
+// Mobile bottom sheet
+
+(function () {
+  const sidebar  = document.getElementById('sidebar');
+  const sheetTop = document.getElementById('sheet-top');
+  const subtitle = document.getElementById('sheet-subtitle');
+  const chevron  = document.getElementById('sheet-chevron');
+  if (!sheetTop) return;
+
+  function isCollapsed() { return sidebar.classList.contains('sheet-collapsed'); }
+
+  function setSheet(collapsed) {
+    sidebar.classList.toggle('sheet-collapsed', collapsed);
+    sheetTop.setAttribute('aria-expanded', String(!collapsed));
+    subtitle.textContent = collapsed ? 'Tap to open controls' : 'Tap to close';
+    // Give the CSS transition time to settle
+    setTimeout(() => map.invalidateSize(), 350);
+  }
+
+  sheetTop.addEventListener('click', () => setSheet(!isCollapsed()));
+
+  // Collapse the sheet when the user taps the map
+  map.on('click mousedown touchstart', () => {if (isMobile() && !isCollapsed()) setSheet(true);});
+
+  // Auto-expand when calculation finishes
+  document.getElementById('calc').addEventListener('click', () => {if (isMobile()) setSheet(false);});
+})();
+
+
+// Mode buttons
 
 document.querySelectorAll('.mb').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -59,12 +92,9 @@ document.querySelectorAll('.mb').forEach(btn => {
 });
 
 
-// -- Context panel --
+// Context panel
 
-document.getElementById('ctx-terrain').addEventListener('change', () => {
-  updateTable();
-  clearOverlay();
-});
+document.getElementById('ctx-terrain').addEventListener('change', () => {updateTable();clearOverlay();});
 
 function updateTable() {
   const speed    = C.MODE_SPEED_KMH[activeModeKey];
@@ -95,7 +125,7 @@ function showCtx(country, terrainOverride) {
 }
 
 
-// -- Sliders (time) --
+// Sliders (time)
 
 const mih = document.getElementById('mih'), mah = document.getElementById('mah');
 const mis = document.getElementById('mis'), mas = document.getElementById('mas');
@@ -109,7 +139,7 @@ mah.addEventListener('change', e => sMax(e.target.value));
 mas.addEventListener('input',  e => sMax(e.target.value));
 
 
-// -- Sliders (distance) --
+// Sliders (distance)
 
 const mid  = document.getElementById('mid'),  mad  = document.getElementById('mad');
 const mids = document.getElementById('mids'), mads = document.getElementById('mads');
@@ -123,7 +153,7 @@ mad.addEventListener('change',  e => sdMax(e.target.value));
 mads.addEventListener('input',  e => sdMax(e.target.value));
 
 
-// -- Time / distance toggle --
+// Time / distance toggle
 
 document.getElementById('dtg').addEventListener('change', function () {
   useDist = this.checked;
@@ -142,7 +172,7 @@ document.getElementById('tp').style.display = 'flex';
 document.getElementById('dp').style.display = 'none';
 
 
-// -- Visibility toggles --
+// Visibility toggles
 
 document.getElementById('show-grid').addEventListener('change', function () {
   gridMarkers.forEach(m => this.checked ? map.addLayer(m) : map.removeLayer(m));
@@ -153,7 +183,7 @@ document.getElementById('show-pts').addEventListener('change', function () {
 });
 
 
-// -- Geocoding --
+// Geocoding
 
 const locEl = document.getElementById('loc');
 const sugEl = document.getElementById('sug');
@@ -213,7 +243,7 @@ function esc(s) {
 }
 
 
-// -- Map click / reverse geocode --
+// Map click and reverse geocode
 
 map.on('click', async e => {
   const { lat, lng } = e.latlng;
@@ -244,7 +274,7 @@ function applyAddress(lat, lng) {
 }
 
 
-// -- Pin --
+// Pin
 
 function placePin(lat, lng) {
   coords = { lat, lng };
@@ -254,7 +284,7 @@ function placePin(lat, lng) {
 }
 
 
-// -- Calculate --
+// Calculation: Travel Distance
 
 document.getElementById('calc').addEventListener('click', () => {
   if (!coords) { alert('Please select a starting location first.'); return; }
@@ -333,7 +363,7 @@ function setStatus(msg, pct) {
 }
 
 
-// -- Render: land grid --
+// Render: land grid
 
 function renderGrid(pts) {
   gridMarkers.forEach(m => map.removeLayer(m));
@@ -358,7 +388,7 @@ function renderGrid(pts) {
 }
 
 
-// -- Render: polygons + endpoint markers --
+// Render: polygons + endpoint markers
 
 function renderResults(workerResult, meta, legOTxt, legITxt) {
   const { outerRing, innerRing, outerGeo, innerGeo } = workerResult;
@@ -411,7 +441,7 @@ function renderResults(workerResult, meta, legOTxt, legITxt) {
 }
 
 
-// -- Clear --
+// Clear
 
 function clearOverlay(resetUI = true) {
   if (worker) { worker.terminate(); worker = null; }
@@ -432,6 +462,6 @@ function clearOverlay(resetUI = true) {
 document.getElementById('clr').addEventListener('click', () => clearOverlay(true));
 
 
-// -- Utility --
+// Utility
 
 function fmt(n) { return Math.round(n).toLocaleString(); }

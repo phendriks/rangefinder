@@ -1,71 +1,70 @@
-/**
- * constants.js — single source of truth for all tuneable values.
- * Loaded via <script> in the browser and importScripts() in the worker.
- */
+// constants.js — single source of truth for all tuneable values.
+// Loaded via script tag in the browser and importScripts() in the worker.
 
 const C = {};
 
-// -- Vector walking --
+// Vector walking
 
-C.VECTOR_COUNT       = 360 / 5;
-C.VECTOR_STEP_DEG    = 360 / C.VECTOR_COUNT;
-C.VECTOR_STEPS       = 250;  // steps per vector; more = finer water detection
-C.VECTOR_STOP_THRESHOLD = 0.25;
+C.VECTOR_COUNT            = 72;   // 360/5, one vector per 5 degrees
+C.VECTOR_STEP_DEG         = 360 / C.VECTOR_COUNT;
+C.VECTOR_STEPS            = 250;  // steps per vector; more means finer water detection
+C.VECTOR_STOP_THRESHOLD   = 0.25; // stop when remaining budget < step * this
 
-C.REDIRECT_ANGLE_MAX  = 20;  // degrees; cone scanned before entering recovery
-C.REDIRECT_ANGLE_STEP = 5;
+C.REDIRECT_ANGLE_MAX      = 20;   // degrees; cone scanned before entering recovery
+C.REDIRECT_ANGLE_STEP     = 5;    // degrees; increment used when scanning for passable bearing
 
-// -- Recovery (when stuck against water) --
+// Recovery mode (entered when no redirect is found within REDIRECT_ANGLE_MAX)
 
-C.RECOVERY_MAX_STEPS           = 5;
-C.RECOVERY_SCAN_ANGLE_MAX      = 90;  // wider scan; must exceed REDIRECT_ANGLE_MAX
-C.RECOVERY_RETURN_THRESHOLD_DEG = 20;
+C.RECOVERY_MAX_STEPS            = 5;
+C.RECOVERY_SCAN_ANGLE_MAX       = 90;  // wider scan; must exceed REDIRECT_ANGLE_MAX
+C.RECOVERY_RETURN_THRESHOLD_DEG = 20;  // degrees; how close to original bearing counts as recovered
 
-// -- Cell types --
+// Cell type enum
 
 C.CELL_WATER    = 0;
 C.CELL_LAND     = 1;
 C.CELL_CROSSING = 2;
 
-// Extra budget consumed per km on a crossing cell (ferry speed + wait time).
-// 1.275 → a 50 km ferry costs 63.75 km of budget.
+// Ferry/bridge crossings consume more budget to model slower effective speed.
+// 1.275 means a 50 km ferry costs 63.75 km of budget.
 C.CROSSING_DISTANCE_FACTOR = 1.275;
 
-// -- Crossing zones --
-// Format: [name, minLat, maxLat, minLng, maxLng]
-// Bounding boxes are deliberately narrow — only the navigable corridor,
-// not the open sea.
+// Crossing zones as bounding boxes: [name, minLat, maxLat, minLng, maxLng]
+// Bounds are narrow to avoid misleading vectors into open ocean.
 C.CROSSING_ZONES = [
-  ['English Channel',   50.0,  51.5,  -2.0,   2.5],  // Dover Strait + tunnel + main ferries
-  ['Øresund',           55.5,  56.1,  12.5,  13.1],  // Copenhagen ↔ Malmö bridge + HH ferry
-  ['Great Belt',        55.1,  55.6,  10.7,  11.3],  // Funen ↔ Zealand fixed link
-  ['Fehmarn Belt',      54.4,  54.95, 10.8,  11.5],  // Puttgarden ↔ Rødby ferry
-  ['Irish Sea North',   54.65, 55.25, -6.1,  -4.7],  // Cairnryan ↔ Belfast
-  ['Irish Sea Central', 53.1,  53.55, -6.5,  -4.4],  // Holyhead ↔ Dublin
-  ['Irish Sea South',   51.7,  52.25, -5.3,  -4.6],  // Fishguard / Pembroke ↔ Rosslare
-  ['Strait of Messina', 37.8,  38.5,  15.3,  15.75], // mainland Italy ↔ Sicily
-  ['Strait of Gibraltar', 35.8, 36.2, -5.5,  -5.2],  // Algeciras ↔ Ceuta
+  ['English Channel',     50.0,  51.5,  -2.0,   2.5],  // Dover Strait + tunnel + main ferries
+  ['Oresund',             55.5,  56.1,  12.5,  13.1],  // Copenhagen to Malmo bridge + HH ferry
+  ['Great Belt',          55.1,  55.6,  10.7,  11.3],  // Funen to Zealand fixed link
+  ['Fehmarn Belt',        54.4,  54.95, 10.8,  11.5],  // Puttgarden to Rodby ferry
+  ['Irish Sea North',     54.65, 55.25, -6.1,  -4.7],  // Cairnryan to Belfast
+  ['Irish Sea Central',   53.1,  53.55, -6.5,  -4.4],  // Holyhead to Dublin
+  ['Irish Sea South',     51.7,  52.25, -5.3,  -4.6],  // Fishguard/Pembroke to Rosslare
+  ['Strait of Messina',   37.8,  38.5,  15.3,  15.75], // mainland Italy to Sicily
+  ['Strait of Gibraltar', 35.8,  36.2,  -5.5,  -5.2],  // Algeciras to Ceuta
 ];
 
-// -- Land grid --
+// Land grid
 
-C.LAT_KM_PER_DEG   = 111.32;
-C.GRID_MARGIN_FACTOR = 0.2;   // padding around outer radius bounding box
-C.GRID_SIZE_DIVISOR  = 10;    // adaptive N = clamp(outerKm / divisor, min, max)
-C.GRID_SIZE_MIN      = 40;
-C.GRID_SIZE_MAX      = 90;    // 90×90 = 8 100 polygon tests
-C.GRID_DOT_RADIUS    = 2;
+C.LAT_KM_PER_DEG           = 111.32;
+C.GRID_MARGIN_FACTOR        = 0.2;   // padding around outer radius bounding box as a fraction
+C.GRID_SIZE_DIVISOR         = 10;    // N = clamp(outerKm / divisor, min, max)
+C.GRID_SIZE_MIN             = 40;
+C.GRID_SIZE_MAX             = 90;
+C.GRID_DOT_RADIUS           = 2;     // px; base radius for land dots on the map
+C.GRID_DOT_CROSSING_RADIUS  = 3;     // px; slightly larger for crossing zone dots
+C.GRID_DOT_FILL_OPACITY     = 0.55;
 
-// -- Tortuosity --
-// τ_terrain: road sinuosity from elevation relief (Ballou 2002, Boscoe 2012).
+// Tortuosity: tau_terrain — road sinuosity added by elevation relief.
+// Values from Ballou 2002, Boscoe 2012, Weiss 2018 / EEA CORINE 2018.
 C.TERRAIN_TORTUOSITY = {
-  flat:     1.00,
-  rolling:  1.08,
-  hilly:    1.22,
-  mountain: 1.45,
+  flat:     1.00,  // under 50m per 10km, near-straight roads
+  rolling:  1.08,  // 50 to 200m, gentle curves
+  hilly:    1.22,  // 200 to 500m, valley crossings and ridge detours
+  mountain: 1.45,  // over 500m, switchbacks and alpine passes
 };
 
-// τ_mode: network constraint per mode (Giacomin & Levinson 2015, Millward 2013).
+// Tortuosity: tau_mode — network constraint per mode.
+// Values from Giacomin & Levinson 2015, Millward et al 2013.
 C.MODE_TORTUOSITY = {
   walk:  1.05,
   run:   1.05,
@@ -74,9 +73,7 @@ C.MODE_TORTUOSITY = {
   drive: 1.20,
 };
 
-// -- Mode definitions --
-// Speeds calibrated against real journeys: 115 ÷ (1.20 × 1.08) ≈ 88.7 km/h
-// crow-flies, matching three measured European drives.
+// Base speeds calibrated against real drives: 115 / (1.20 * 1.08) = 88.7 km/h crow-flies.
 C.MODE_SPEED_KMH = {
   drive: 115,
   moto:  115,
@@ -86,17 +83,16 @@ C.MODE_SPEED_KMH = {
 };
 
 C.MODE_NOTE = {
-  drive: '115 km/h base · τ_mode 1.20 (Giacomin & Levinson 2015)',
-  moto:  '115 km/h base · τ_mode 1.15 — filters traffic, handles passes better',
-  cycle: '18 km/h base · τ_mode 1.08 (Millward et al. 2013)',
-  run:   '10 km/h base · τ_mode 1.05 — open land accessible',
-  walk:  '5 km/h base · τ_mode 1.05 — open land accessible',
+  drive: '115 km/h base, tau_mode 1.20 (Giacomin & Levinson 2015)',
+  moto:  '115 km/h base, tau_mode 1.15, filters traffic and handles mountain passes better',
+  cycle: '18 km/h base, tau_mode 1.08 (Millward et al. 2013)',
+  run:   '10 km/h base, tau_mode 1.05, open land accessible',
+  walk:  '5 km/h base, tau_mode 1.05, open land accessible',
 };
 
-// -- Country database --
-// Format: [name, minLat, maxLat, minLng, maxLng, highwayKmh, defaultTerrain]
-// Speeds: EUR-Lex + national road authority publications.
-// Terrain: generalised from SRTM 90m + EEA CORINE Land Cover (2018).
+// Country database: [name, minLat, maxLat, minLng, maxLng, highwayKmh, defaultTerrain]
+// Speeds from EUR-Lex and national road authority publications.
+// Terrain generalised from SRTM 90m and EEA CORINE Land Cover 2018.
 C.COUNTRY_DB = [
   ['Albania',       39.6, 42.7,  19.2,  21.1,  110, 'hilly'],
   ['Austria',       46.4, 49.0,   9.5,  17.2,  130, 'hilly'],
@@ -141,13 +137,31 @@ C.COUNTRY_DB = [
   ['UK',            49.9, 60.9,  -8.2,   2.0,  112, 'rolling'],
 ];
 
-// -- External data + geocoding --
+// External data and geocoding
 
-C.LAND_DATA_URL               = 'https://cdn.jsdelivr.net/npm/world-atlas@2/land-110m.json';
-C.NOMINATIM_URL               = 'https://nominatim.openstreetmap.org';
-C.GEOCODE_MAX_RESULTS         = 3;
-C.GEOCODE_DEBOUNCE_MS         = 1200;
+C.LAND_DATA_URL  = 'https://cdn.jsdelivr.net/npm/world-atlas@2/land-110m.json';
+C.NOMINATIM_URL  = 'https://nominatim.openstreetmap.org';
+C.NOMINATIM_HEADERS = { 'Accept-Language': 'en', 'User-Agent': 'RangeFinderApp/1.0' };
+
+C.GEOCODE_MAX_RESULTS            = 3;
+C.GEOCODE_DEBOUNCE_MS            = 1200;
+C.GEOCODE_MIN_QUERY_LENGTH       = 3;
 C.REVERSE_GEOCODE_MAX_DISTANCE_M = 25;
+C.REVERSE_GEOCODE_ZOOM           = 18;
 
-// Expose globally (window.C in browser, worker global scope in worker).
+// Map and UI layout
+
+C.MAP_INITIAL_CENTER   = [48, 10];
+C.MAP_INITIAL_ZOOM     = 5;
+C.MAP_GEOCODE_ZOOM     = 10;   // zoom level used when flying to a geocoded result
+C.MAP_FIT_PADDING_PX   = 40;   // px padding passed to fitBounds
+C.MOBILE_BREAKPOINT_PX = 640;
+C.SIDEBAR_WIDTH_PX     = 300;
+C.SHEET_TRANSITION_MS  = 350;  // wait after CSS sheet animation before calling invalidateSize
+C.CANVAS_PADDING       = 0.5;  // Leaflet canvas renderer padding factor
+
+C.EP_MARKER_SIZE_PX  = 18;   // width and height of numbered endpoint markers
+C.EP_MARKER_Z_OFFSET = 100;  // zIndexOffset keeps endpoint markers above polygons
+
+// Expose as C on both window (browser) and global scope (worker)
 self.C = C;

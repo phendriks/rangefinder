@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Range Finder</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300;400;600;700&display=swap" rel="stylesheet">
@@ -14,12 +14,13 @@
       --tx:   #333;    --mt:   #777;
       --ac:   #0078a8; --ach:  #005f85; --acl: #e6f4fa;
       --wh:   #fff;    --r:    3px;
+      --handle-h: 52px;
     }
 
     html, body { height: 100%; font-family: 'Source Sans 3', sans-serif; font-size: 14px; color: var(--tx); overflow: hidden; }
     #map { position: absolute; inset: 0; z-index: 0; }
 
-    /* ── Sidebar ── */
+    /* ── Sidebar (desktop) ── */
     #sidebar {
       position: absolute; top: 0; left: 0; width: 300px; height: 100%;
       background: var(--bg); border-right: 1px solid var(--bd); z-index: 1000;
@@ -50,7 +51,7 @@
     #sug { border: 1px solid var(--bd); border-top: none; border-radius: 0 0 var(--r) var(--r); background: var(--wh); overflow: hidden; display: none; }
     .si  { padding: 7px 10px; cursor: pointer; border-bottom: 1px solid #ece8e2; font-size: 13px; line-height: 1.35; transition: background .1s; }
     .si:last-child { border-bottom: none; }
-    .si:hover { background: var(--acl); }
+    .si:hover, .si:active { background: var(--acl); }
     .si .sm { font-weight: 600; }
     .si .ss { font-size: 11.5px; color: var(--mt); margin-top: 1px; }
 
@@ -74,6 +75,7 @@
       background: var(--wh); font-family: inherit; font-size: 11px; font-weight: 600; color: var(--mt);
       cursor: pointer; text-align: center; transition: all .12s;
       display: flex; flex-direction: column; align-items: center; gap: 3px;
+      -webkit-tap-highlight-color: transparent;
     }
     .mb:hover  { border-color: var(--ac); color: var(--ac); background: var(--acl); }
     .mb.active { background: var(--ac); border-color: var(--ac); color: #fff; }
@@ -127,10 +129,19 @@
     #progress-bar { height: 100%; width: 0%; background: var(--ac); transition: width .2s; border-radius: 2px; }
 
     /* ── Buttons ── */
-    #calc { width: 100%; padding: 10px; background: var(--ac); color: #fff; border: none; border-radius: var(--r); font-family: inherit; font-size: 14px; font-weight: 700; letter-spacing: .02em; cursor: pointer; transition: background .15s; }
+    #calc {
+      width: 100%; padding: 10px; background: var(--ac); color: #fff; border: none; border-radius: var(--r);
+      font-family: inherit; font-size: 14px; font-weight: 700; letter-spacing: .02em; cursor: pointer;
+      transition: background .15s; -webkit-tap-highlight-color: transparent;
+    }
     #calc:hover:not(:disabled) { background: var(--ach); }
     #calc:disabled { background: #aaa; cursor: not-allowed; }
-    #clr { background: none; border: 1px solid var(--bd); border-radius: var(--r); padding: 5px 10px; font-family: inherit; font-size: 12px; cursor: pointer; color: var(--mt); transition: all .12s; width: 100%; display: none; }
+    #clr {
+      background: none; border: 1px solid var(--bd); border-radius: var(--r);
+      padding: 5px 10px; font-family: inherit; font-size: 12px; cursor: pointer;
+      color: var(--mt); transition: all .12s; width: 100%; display: none;
+      -webkit-tap-highlight-color: transparent;
+    }
     #clr:hover { border-color: #c0392b; color: #c0392b; }
 
     /* ── Info card ── */
@@ -157,11 +168,122 @@
     }
 
     .leaflet-control-attribution { font-family: 'Source Sans 3', sans-serif; font-size: 10px; }
+
+    /* ── Mobile-only handle strip (hidden on desktop) ── */
+    #sheet-top { display: none; }
+
+
+    /* ════════════════════════════════════════════════════
+       MOBILE — bottom sheet layout
+       ════════════════════════════════════════════════════ */
+    @media (max-width: 639px) {
+
+      /* Map fills entire screen */
+      #map { margin: 0 !important; }
+
+      /* Sidebar → fixed bottom sheet */
+      #sidebar {
+        position: fixed;
+        top: auto; bottom: 0; left: 0; right: 0;
+        width: 100%; height: auto;
+        max-height: 92dvh;
+        border-right: none;
+        border-top: 1px solid var(--bd);
+        border-radius: 16px 16px 0 0;
+        box-shadow: 0 -4px 24px rgba(0,0,0,.14);
+        overflow: hidden;
+        transition: max-height .32s cubic-bezier(.4,0,.2,1);
+      }
+
+      /* Collapsed: only the sticky handle strip is visible */
+      #sidebar.sheet-collapsed { max-height: var(--handle-h); }
+
+      /* Handle strip */
+      #sheet-top {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        background: var(--bg-d);
+        border-bottom: 1px solid var(--bd);
+        flex-shrink: 0;
+        cursor: pointer;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+        padding: 6px 14px 8px;
+        gap: 5px;
+      }
+
+      #sheet-handle {
+        width: 36px; height: 4px;
+        background: var(--bd); border-radius: 2px;
+      }
+
+      #sheet-quick {
+        display: flex;
+        align-items: center;
+        width: 100%;
+        gap: 8px;
+      }
+
+      #sheet-title    { font-size: 14px; font-weight: 700; color: #222; flex: 1; }
+      #sheet-subtitle { font-size: 11px; color: var(--mt); }
+
+      #sheet-chevron {
+        width: 20px; height: 20px; color: var(--mt);
+        transition: transform .3s;
+        flex-shrink: 0;
+      }
+      /* Chevron points up when collapsed (to indicate "open"), down when expanded */
+      #sidebar.sheet-collapsed #sheet-chevron { transform: rotate(180deg); }
+
+      /* Desktop header hidden on mobile */
+      #hdr { display: none; }
+
+      /* Scrollable body */
+      #body {
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        max-height: calc(92dvh - var(--handle-h));
+        padding-bottom: max(env(safe-area-inset-bottom, 12px), 12px);
+      }
+
+      /* Bigger touch targets */
+      input[type="range"]  { height: 28px; }
+      .mb                  { padding: 10px 2px 9px; }
+      .hi2, .di            { font-size: 16px; padding: 7px; }
+      #calc                { padding: 13px; font-size: 15px; }
+      .opts-row            { gap: 12px; font-size: 13px; }
+      .opts-row input[type="checkbox"] { width: 16px; height: 16px; }
+
+      /* Ensure suggestion dropdown floats above the sheet */
+      #sug { position: relative; z-index: 3000; }
+
+      /* Zoom controls above the sheet when collapsed */
+      .leaflet-bottom.leaflet-right {
+        bottom: calc(var(--handle-h) + 10px) !important;
+      }
+    }
   </style>
 </head>
 <body>
 
-<div id="sidebar">
+<div id="sidebar" class="sheet-collapsed">
+
+  <!-- Mobile-only handle/title strip (hidden on desktop via CSS) -->
+  <div id="sheet-top" role="button" aria-expanded="false" aria-label="Toggle controls panel">
+    <div id="sheet-handle"></div>
+    <div id="sheet-quick">
+      <div>
+        <div id="sheet-title">Range Finder</div>
+        <div id="sheet-subtitle">Tap to open controls</div>
+      </div>
+      <svg id="sheet-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="18 15 12 9 6 15"/>
+      </svg>
+    </div>
+  </div>
+
+  <!-- Desktop header (hidden on mobile) -->
   <div id="hdr">
     <h1>Range Finder</h1>
     <p>Compute a land-aware reachable area using vector walking. No routing API required.</p>
@@ -173,7 +295,7 @@
     <div class="fl">
       <label class="lbl">Starting Location</label>
       <div id="lw">
-        <input type="text" id="loc" placeholder="Type an address or click the map…" autocomplete="off" spellcheck="false">
+        <input type="text" id="loc" placeholder="Type an address or tap the map…" autocomplete="off" spellcheck="false">
         <div id="sug"></div>
       </div>
     </div>
@@ -337,7 +459,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
 
-<!-- constants.js must load before app.js so C.* is available -->
 <script src="constants.js"></script>
 <script src="app.js"></script>
 </body>
