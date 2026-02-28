@@ -115,8 +115,8 @@ function buildGrid(clat, clng, maxKm) {
 	const marginKm = maxKm * C.GRID_MARGIN_FACTOR;
 	const rKm = maxKm + marginKm;
 
-	const latDelta = rKm / 111;
-	const lngDelta = rKm / (111 * Math.cos(clat * Math.PI / 180));
+	const latDelta = rKm / C.KM_PER_DEG_LAT;
+	const lngDelta = rKm / (C.KM_PER_DEG_LAT * Math.cos(clat * Math.PI / 180));
 
 	const minLat = clat - latDelta;
 	const maxLat = clat + latDelta;
@@ -125,20 +125,44 @@ function buildGrid(clat, clng, maxKm) {
 
 	// IMPORTANT: constants.js defines GRID_SIZE_DIVISOR as a divisor, not a fixed N.
 	// N grows with range: N = clamp(outerKm / divisor, min, max)
-	const N = clamp(Math.round(maxKm / C.GRID_SIZE_DIVISOR), C.GRID_SIZE_MIN, C.GRID_SIZE_MAX);
+	let N = clamp(Math.round(maxKm / C.GRID_SIZE_DIVISOR), C.GRID_SIZE_MIN, C.GRID_SIZE_MAX);
+	N = clamp(N + C.GRID_SIZE_BONUS, C.GRID_SIZE_MIN, C.GRID_SIZE_MAX);
 
 	const pts = [];
 	const cellTypes = [];
 	for (let i = 0; i <= N; i++) {
-	for (let j = 0; j <= N; j++) {
-		const lat = minLat + (i / N) * (maxLat - minLat);
-		const lng = minLng + (j / N) * (maxLng - minLng);
-		pts.push([lat, lng]);
-		cellTypes.push(classifyCell(lat, lng));
-	}
+		for (let j = 0; j <= N; j++) {
+			const lat = minLat + (i / N) * (maxLat - minLat);
+			const lng = minLng + (j / N) * (maxLng - minLng);
+			pts.push([lat, lng]);
+			cellTypes.push(classifyCell(lat, lng));
+		}
 	}
 
-	return { pts, cellTypes, N, minLat, maxLat, minLng, maxLng };
+	const neighbors = buildGridNeighbors(N);
+	return { pts, cellTypes, N, minLat, maxLat, minLng, maxLng, neighbors };
+}
+
+function buildGridNeighbors(N) {
+	const side = N + 1;
+	const neighbors = new Array(side * side);
+	for (let i = 0; i <= N; i++) {
+		for (let j = 0; j <= N; j++) {
+			const idx = i * side + j;
+			const list = [];
+			for (let di = -1; di <= 1; di++) {
+				for (let dj = -1; dj <= 1; dj++) {
+					if (!di && !dj) continue;
+					const ni = i + di;
+					const nj = j + dj;
+					if (ni < 0 || nj < 0 || ni > N || nj > N) continue;
+					list.push(ni * side + nj);
+				}
+			}
+			neighbors[idx] = list;
+		}
+	}
+	return neighbors;
 }
 
 function isLandPoint(lat, lng) {
@@ -207,8 +231,8 @@ class MinHeap {
 	}
 }
 
-function computeDistanceField(grid, maxKm, clat, clng) {
-	const { pts, N, cellTypes } = grid;
+function computeDistanceField(mesh, maxKm, clat, clng) {
+	const { pts, cellTypes, neighbors } = mesh;
 	const costs = new Array(pts.length).fill(Infinity);
 
 	// Snap origin to a non-water cell to avoid "coastline" failures on coarse grids.
@@ -231,31 +255,21 @@ function computeDistanceField(grid, maxKm, clat, clng) {
 	if (baseCost !== costs[idx]) continue;
 	if (baseCost > maxKm) continue;
 
-	const i = Math.floor(idx / (N + 1));
-	const j = idx % (N + 1);
+		const nbs = neighbors[idx];
+		for (let k = 0; k < nbs.length; k++) {
+			const nIdx = nbs[k];
+			const cellType = cellTypes[nIdx];
+			if (cellType === C.CELL_WATER) continue;
 
-	for (let di = -1; di <= 1; di++) {
-		for (let dj = -1; dj <= 1; dj++) {
-		if (!di && !dj) continue;
+			const stepKm = haversineKm(pts[idx], pts[nIdx]);
+			const multiplier = (cellType === C.CELL_CROSSING) ? C.CROSSING_DISTANCE_FACTOR : 1;
+			const newCost = baseCost + stepKm * multiplier;
 
-		const ni = i + di;
-		const nj = j + dj;
-		if (ni < 0 || nj < 0 || ni > N || nj > N) continue;
-
-		const nIdx = ni * (N + 1) + nj;
-		const cellType = cellTypes[nIdx];
-		if (cellType === C.CELL_WATER) continue;
-
-		const stepKm = haversineKm(pts[idx], pts[nIdx]);
-		const multiplier = (cellType === C.CELL_CROSSING) ? C.CROSSING_DISTANCE_FACTOR : 1;
-		const newCost = baseCost + stepKm * multiplier;
-
-		if (newCost < costs[nIdx] && newCost <= maxKm) {
-			costs[nIdx] = newCost;
-			heap.push({ idx: nIdx, cost: newCost });
+			if (newCost < costs[nIdx] && newCost <= maxKm) {
+				costs[nIdx] = newCost;
+				heap.push({ idx: nIdx, cost: newCost });
+			}
 		}
-		}
-	}
 	}
 
 	return costs;
@@ -283,7 +297,7 @@ function findClosestNonWaterIndex(pts, cellTypes, lat, lng) {
 }
 
 function haversineKm(a, b) {
-	const R = 6371;
+	const R = C.EARTH_RADIUS_KM;
 	const dLat = (b[0] - a[0]) * Math.PI / 180;
 	const dLng = (b[1] - a[1]) * Math.PI / 180;
 
@@ -301,7 +315,7 @@ function computeIsoPolygon(grid, costs, maxBandKm) {
 	// Build a point FeatureCollection for Turf isobands.
 	// Water/unreached points become very large to prevent inclusion.
 	const pts = [];
-	const BIG = maxBandKm * 1000;
+	const BIG = maxBandKm * C.ISOBAND_UNREACHED_COST_FACTOR;
 	for (let i = 0; i < grid.pts.length; i++) {
 	const [lat, lng] = grid.pts[i];
 	const v = Number.isFinite(costs[i]) ? costs[i] : BIG;

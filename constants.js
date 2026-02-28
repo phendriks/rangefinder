@@ -15,6 +15,13 @@ C.DISTANCE_UNITS			= 'kilometers';
 
 C.EXTRACTION_STEPS_DIVISOR	= 120;
 
+// Geodesy
+C.EARTH_RADIUS_KM				= 6371;
+C.KM_PER_DEG_LAT				= 111;
+
+// Isobands
+C.ISOBAND_UNREACHED_COST_FACTOR	= 1000;
+
 // Ferry/bridge crossings consume more budget to model slower effective speed.
 C.CROSSING_DISTANCE_FACTOR	= 1.5;
 
@@ -23,6 +30,7 @@ C.GRID_MARGIN_FACTOR		= 0.2;	 // padding around outer radius bounding box as a f
 C.GRID_SIZE_DIVISOR			= 10;		// N = clamp(outerKm / divisor, min, max)
 C.GRID_SIZE_MIN				= 20;
 C.GRID_SIZE_MAX				= 90;
+C.GRID_SIZE_BONUS			= 2;
 
 // Tortuosity: tau_terrain - road sinuosity added by elevation relief.
 // Values from Ballou 2002, Boscoe 2012, Weiss 2018 / EEA CORINE 2018.
