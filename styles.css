@@ -267,6 +267,9 @@
     display: none;
     gap: 8px;
     align-items: center;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
     padding: 10px;
     background: rgba(240, 237, 232, 0.98);
     border-top: 1px solid var(--bd);
@@ -303,14 +306,17 @@
 
 .mini-sel {
     min-width: 0;
+    flex: 1 1 120px;
+    max-width: 180px;
 }
 
 .mini-range {
     display: flex;
     gap: 6px;
     align-items: center;
-    flex: 1;
+    flex: 0 0 auto;
     min-width: 0;
+    flex-wrap: nowrap;
 }
 
 .mini-in {

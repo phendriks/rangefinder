@@ -460,6 +460,41 @@
 
 <div id="map"></div>
 
+<!-- Mobile mini bar (shown when the sheet is collapsed) -->
+<div id="mini-bar" class="mini-bar mini-hidden" aria-label="Quick range controls">
+  <button id="mini-expand" class="mini-btn" type="button" aria-label="Open sidebar">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <polyline points="18 15 12 9 6 15"/>
+    </svg>
+  </button>
+
+  <select id="mini-mode" class="mini-sel" aria-label="Transport type">
+    <option value="drive">Drive</option>
+    <option value="moto">Moto</option>
+    <option value="cycle">Cycle</option>
+    <option value="run">Run</option>
+    <option value="walk">Walk</option>
+  </select>
+
+  <label class="tgr" style="margin:0;">
+    <span id="mini-lt" class="mini-on">Time</span>
+    <span class="tgs">
+      <input type="checkbox" id="mini-dtg" aria-label="Toggle distance/time">
+      <span class="tgt"></span>
+    </span>
+    <span id="mini-ld">Dist</span>
+  </label>
+
+  <div class="mini-range" aria-label="Min/max range">
+    <input id="mini-min" class="mini-in" type="number" inputmode="decimal" aria-label="Minimum">
+    <span class="mini-sep">–</span>
+    <input id="mini-max" class="mini-in" type="number" inputmode="decimal" aria-label="Maximum">
+    <span id="mini-unit" class="mini-unit">km</span>
+  </div>
+
+  <button id="mini-calc" class="mini-btn primary" type="button">Show</button>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
 
