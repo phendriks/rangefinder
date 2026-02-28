@@ -22,6 +22,16 @@ C.KM_PER_DEG_LAT				= 111;
 // Isobands
 C.ISOBAND_UNREACHED_COST_FACTOR	= 1000;
 
+// Delaunay neighbor controls
+C.DELAUNAY_MAX_EDGE_FACTOR		= 3;
+
+// Delaunay jitter breaks grid degeneracy for triangulation.
+C.DELAUNAY_JITTER_FACTOR		= 0.15;
+C.DELAUNAY_JITTER_SEED			= 1;
+C.DELAUNAY_JITTER_HASH_A		= 12.9898;
+C.DELAUNAY_JITTER_HASH_B		= 43758.5453;
+C.DELAUNAY_JITTER_SALT_STEP	= 1013;
+
 // Ferry/bridge crossings consume more budget to model slower effective speed.
 C.CROSSING_DISTANCE_FACTOR	= 1.5;
 

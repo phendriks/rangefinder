@@ -5,6 +5,7 @@
 
 importScripts('https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js');
 importScripts('https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js');
+importScripts('https://cdn.jsdelivr.net/npm/delaunator@5/delaunator.min.js');
 importScripts('constants.js');
 
 let landFeatures = null; // FeatureCollection of land polygons
@@ -139,8 +140,74 @@ function buildGrid(clat, clng, maxKm) {
 		}
 	}
 
-	const neighbors = buildGridNeighbors(N);
+	let neighbors = buildDelaunayNeighbors(pts, clat, clng, N);
+	if (!neighbors) neighbors = buildGridNeighbors(N);
 	return { pts, cellTypes, N, minLat, maxLat, minLng, maxLng, neighbors };
+}
+
+function buildDelaunayNeighbors(pts, clat, clng, N) {
+	if (typeof Delaunator === 'undefined') return null;
+	if (!pts || pts.length < 3) return null;
+
+	let stepKm = 0;
+	if (N > 0 && pts.length > 1) {
+		stepKm = haversineKm(pts[0], pts[1]);
+	}
+	if (!Number.isFinite(stepKm) || stepKm <= 0) stepKm = 1;
+	const jitterAmpKm = stepKm * C.DELAUNAY_JITTER_FACTOR;
+
+	const refLatRad = clat * Math.PI / 180;
+	const cosLat = Math.cos(refLatRad);
+	const xy = new Array(pts.length);
+	for (let i = 0; i < pts.length; i++) {
+		const lat = pts[i][0];
+		const lng = pts[i][1];
+		let x = (lng - clng) * C.KM_PER_DEG_LAT * cosLat;
+		let y = (lat - clat) * C.KM_PER_DEG_LAT;
+		x += (hash01(i, 0) - 0.5) * jitterAmpKm;
+		y += (hash01(i, 1) - 0.5) * jitterAmpKm;
+		xy[i] = [x, y];
+	}
+	const maxEdgeKm = stepKm * C.DELAUNAY_MAX_EDGE_FACTOR;
+
+	let delaunay = null;
+	try {
+		delaunay = Delaunator.from(xy);
+	} catch (e) {
+		return null;
+	}
+	if (!delaunay || !delaunay.triangles) return null;
+
+	const neighbors = new Array(pts.length);
+	for (let i = 0; i < neighbors.length; i++) neighbors[i] = [];
+
+	const tris = delaunay.triangles;
+	for (let t = 0; t < tris.length; t += 3) {
+		const a = tris[t];
+		const b = tris[t + 1];
+		const c = tris[t + 2];
+		addNeighborEdge(neighbors, pts, a, b, maxEdgeKm);
+		addNeighborEdge(neighbors, pts, b, c, maxEdgeKm);
+		addNeighborEdge(neighbors, pts, c, a, maxEdgeKm);
+	}
+
+	return neighbors;
+}
+
+function hash01(i, salt) {
+	const x = Math.sin((i + (salt * C.DELAUNAY_JITTER_SALT_STEP) + C.DELAUNAY_JITTER_SEED) * C.DELAUNAY_JITTER_HASH_A) * C.DELAUNAY_JITTER_HASH_B;
+	return x - Math.floor(x);
+}
+
+function addNeighborEdge(neighbors, pts, a, b, maxEdgeKm) {
+	if (a === b) return;
+	if (a < 0 || b < 0 || a >= pts.length || b >= pts.length) return;
+	const d = haversineKm(pts[a], pts[b]);
+	if (!Number.isFinite(d) || d > maxEdgeKm) return;
+	const na = neighbors[a];
+	const nb = neighbors[b];
+	if (na.indexOf(b) < 0) na.push(b);
+	if (nb.indexOf(a) < 0) nb.push(a);
 }
 
 function buildGridNeighbors(N) {
