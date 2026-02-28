@@ -3,17 +3,17 @@
 
 const C = {}; 
 
-C.VECTOR_COUNT				= 90;
-C.VECTOR_STEP_DEG			= 360 / C.VECTOR_COUNT;
+C.VECTOR_COUNT					= 90;
+C.VECTOR_STEP_DEG				= 360 / C.VECTOR_COUNT;
 
-C.CELL_WATER				= 0;
-C.CELL_LAND					= 1;
-C.CELL_CROSSING				= 2;
+C.CELL_WATER					= 0;
+C.CELL_LAND						= 1;
+C.CELL_CROSSING					= 2;
 
-C.NEIGHBOR_MODE_8			= true;
-C.DISTANCE_UNITS			= 'kilometers';
+C.NEIGHBOR_MODE_8				= true;
+C.DISTANCE_UNITS				= 'kilometers';
 
-C.EXTRACTION_STEPS_DIVISOR	= 120;
+C.EXTRACTION_STEPS_DIVISOR		= 120;
 
 // Geodesy
 C.EARTH_RADIUS_KM				= 6371;
@@ -30,17 +30,43 @@ C.DELAUNAY_JITTER_FACTOR		= 0.15;
 C.DELAUNAY_JITTER_SEED			= 1;
 C.DELAUNAY_JITTER_HASH_A		= 12.9898;
 C.DELAUNAY_JITTER_HASH_B		= 43758.5453;
-C.DELAUNAY_JITTER_SALT_STEP	= 1013;
+C.DELAUNAY_JITTER_SALT_STEP		= 1013;
 
 // Ferry/bridge crossings consume more budget to model slower effective speed.
-C.CROSSING_DISTANCE_FACTOR	= 1.5;
+C.CROSSING_DISTANCE_FACTOR		= 1.5;
 
 // Land grid
-C.GRID_MARGIN_FACTOR		= 0.2;	 // padding around outer radius bounding box as a fraction
-C.GRID_SIZE_DIVISOR			= 10;		// N = clamp(outerKm / divisor, min, max)
-C.GRID_SIZE_MIN				= 20;
-C.GRID_SIZE_MAX				= 90;
-C.GRID_SIZE_BONUS			= 2;
+C.GRID_MARGIN_FACTOR			= 0.2;	 // padding around outer radius bounding box as a fraction
+C.GRID_SIZE_DIVISOR				= 10;		// N = clamp(outerKm / divisor, min, max)
+C.GRID_SIZE_MIN					= 20;
+C.GRID_SIZE_MAX					= 90;
+C.GRID_SIZE_BONUS				= 2;
+
+C.GRID_DOT_RADIUS					= 1;
+C.GRID_DOT_RADIUS_CROSSING_BONUS	= 1;
+
+C.SITE_COLOUR_LAND				= '#28a050';
+C.SITE_COLOUR_CROSSING			= '#e08020';
+C.SITE_COLOUR_WATER				= '#2b6cc4';
+
+C.SITE_FILL_OPACITY_LAND		= 0.6;
+C.SITE_FILL_OPACITY_CROSSING	= 0.6;
+C.SITE_FILL_OPACITY_WATER		= 0.4;
+
+// Phase 5 sampling
+
+C.LLOYD_ITERATIONS				= 2;
+C.LLOYD_ALPHA					= .1;
+C.LLOYD_JITTER_FACTOR			= .9;
+C.LLOYD_HASH_CELL_FACTOR		= 2.5;
+
+C.RASTER_HASH_CELL_FACTOR		= 2.0;
+
+// Phase 5.4 mesh contour extraction
+
+C.CONTOUR_KEY_SCALE				= 1000;
+C.CONTOUR_MAX_STEPS				= 200000;
+C.CONTOUR_MIN_RING_POINTS		= 4;
 
 // Tortuosity: tau_terrain - road sinuosity added by elevation relief.
 // Values from Ballou 2002, Boscoe 2012, Weiss 2018 / EEA CORINE 2018.

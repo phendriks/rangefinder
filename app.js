@@ -444,13 +444,25 @@ function renderGrid(pts) {
 
 	pts.forEach(p => {
 		const crossing = p.cell === C.CELL_CROSSING;
-		const colour = crossing ? '#e08020' : '#28a050';
+		const land = p.cell === C.CELL_LAND;
+		const colour = crossing
+			? C.SITE_COLOUR_CROSSING
+			: land
+				? C.SITE_COLOUR_LAND
+				: C.SITE_COLOUR_WATER;
+		const opacity = crossing
+			? C.SITE_FILL_OPACITY_CROSSING
+			: land
+				? C.SITE_FILL_OPACITY_LAND
+				: C.SITE_FILL_OPACITY_WATER;
 		const m = L.circleMarker([p.lat, p.lng], {
 			renderer: canvasRenderer,
-			radius: crossing ? C.GRID_DOT_RADIUS + 1 : C.GRID_DOT_RADIUS,
+			radius: crossing
+				? C.GRID_DOT_RADIUS + C.GRID_DOT_RADIUS_CROSSING_BONUS
+				: C.GRID_DOT_RADIUS,
 			color: colour,
 			fillColor: colour,
-			fillOpacity: 0.55,
+			fillOpacity: opacity,
 			weight: 0
 		});
 		if (showGrid) m.addTo(map);

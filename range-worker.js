@@ -20,21 +20,22 @@ self.onmessage = async (e) => {
 
 	await ensureLandLoaded();
 
-	self.postMessage({ type: 'status', msg: 'Building grid...' });
-	const grid = buildGrid(clat, clng, outerKm);
+	self.postMessage({ type: 'status', msg: 'Building mesh...' });
+	const mesh = buildSitesMesh(clat, clng, outerKm);
 
 	// Let the app render debug dots if enabled.
 	self.postMessage({
 		type: 'grid',
-		pts: grid.pts.map((p, idx) => ({ lat: p[0], lng: p[1], cell: grid.cellTypes[idx] }))
+		pts: mesh.pts
+			.map((p, idx) => ({ lat: p[0], lng: p[1], cell: mesh.cellTypes[idx] }))
 	});
 
 	self.postMessage({ type: 'status', msg: 'Walking land graph...' });
-	const costs = computeDistanceField(grid, outerKm, clat, clng);
+	const costs = computeDistanceField(mesh, outerKm, clat, clng);
 
 	self.postMessage({ type: 'status', msg: 'Extracting geometry...' });
-	const outer = computeIsoPolygon(grid, costs, outerKm);
-	const inner = innerKm > 0 ? computeIsoPolygon(grid, costs, innerKm) : null;
+	const outer = computeIsoPolygonSites(mesh, costs, outerKm);
+	const inner = innerKm > 0 ? computeIsoPolygonSites(mesh, costs, innerKm) : null;
 
 	if (!outer || !outer.ring || outer.ring.length < 4) {
 		self.postMessage({
@@ -140,17 +141,90 @@ function buildGrid(clat, clng, maxKm) {
 		}
 	}
 
-	let neighbors = buildDelaunayNeighbors(pts, clat, clng, N);
+	let neighbors = buildDelaunayNeighbors(pts, clat, clng, N, 0);
 	if (!neighbors) neighbors = buildGridNeighbors(N);
 	return { pts, cellTypes, N, minLat, maxLat, minLng, maxLng, neighbors };
 }
 
-function buildDelaunayNeighbors(pts, clat, clng, N) {
+function buildSitesMesh(clat, clng, maxKm) {
+	const marginKm = maxKm * C.GRID_MARGIN_FACTOR;
+	const rKm = maxKm + marginKm;
+
+	const latDelta = rKm / C.KM_PER_DEG_LAT;
+	const lngDelta = rKm / (C.KM_PER_DEG_LAT * Math.cos(clat * Math.PI / 180));
+
+	const minLat = clat - latDelta;
+	const maxLat = clat + latDelta;
+	const minLng = clng - lngDelta;
+	const maxLng = clng + lngDelta;
+
+	let N = clamp(Math.round(maxKm / C.GRID_SIZE_DIVISOR), C.GRID_SIZE_MIN, C.GRID_SIZE_MAX);
+	N = clamp(N + C.GRID_SIZE_BONUS, C.GRID_SIZE_MIN, C.GRID_SIZE_MAX);
+
+	const stepLat = (maxLat - minLat) / N;
+	const stepLng = (maxLng - minLng) / N;
+	const refLatRad = clat * Math.PI / 180;
+	const cosLat = Math.cos(refLatRad);
+	const stepKmHint = Math.max(1, Math.min(
+		Math.abs(stepLat) * C.KM_PER_DEG_LAT,
+		Math.abs(stepLng) * C.KM_PER_DEG_LAT * cosLat
+	));
+
+	let sites = buildJitteredSites(minLat, maxLat, minLng, maxLng, clat, clng, N, stepKmHint);
+	sites = lloydRelax(sites, minLat, maxLat, minLng, maxLng, clat, clng, N, stepKmHint);
+
+	const pts = new Array(sites.length);
+	const cellTypes = new Array(sites.length);
+	for (let i = 0; i < sites.length; i++) {
+		pts[i] = [sites[i].lat, sites[i].lng];
+		cellTypes[i] = classifyCell(sites[i].lat, sites[i].lng);
+	}
+
+	let delaunayMesh = buildDelaunayMesh(pts, clat, clng, 0, stepKmHint);
+	if (!delaunayMesh) {
+		delaunayMesh = {
+			neighbors: buildGridNeighbors(N),
+			triangles: null,
+			xy: null
+		};
+	}
+	return {
+		pts,
+		cellTypes,
+		N,
+		minLat,
+		maxLat,
+		minLng,
+		maxLng,
+		neighbors: delaunayMesh.neighbors,
+		triangles: delaunayMesh.triangles,
+		xy: delaunayMesh.xy,
+		stepKmHint,
+		clat,
+		clng
+	};
+}
+
+function buildRasterGrid(mesh) {
+	const pts = [];
+	const N = mesh.N;
+	for (let i = 0; i <= N; i++) {
+		for (let j = 0; j <= N; j++) {
+			const lat = mesh.minLat + (i / N) * (mesh.maxLat - mesh.minLat);
+			const lng = mesh.minLng + (j / N) * (mesh.maxLng - mesh.minLng);
+			pts.push([lat, lng]);
+		}
+	}
+	return { pts, N, minLat: mesh.minLat, maxLat: mesh.maxLat, minLng: mesh.minLng, maxLng: mesh.maxLng };
+}
+
+function buildDelaunayMesh(pts, clat, clng, N, stepKmHint) {
 	if (typeof Delaunator === 'undefined') return null;
 	if (!pts || pts.length < 3) return null;
 
 	let stepKm = 0;
-	if (N > 0 && pts.length > 1) {
+	if (Number.isFinite(stepKmHint) && stepKmHint > 0) stepKm = stepKmHint;
+	if (!stepKm && N > 0 && pts.length > 1) {
 		stepKm = haversineKm(pts[0], pts[1]);
 	}
 	if (!Number.isFinite(stepKm) || stepKm <= 0) stepKm = 1;
@@ -159,14 +233,18 @@ function buildDelaunayNeighbors(pts, clat, clng, N) {
 	const refLatRad = clat * Math.PI / 180;
 	const cosLat = Math.cos(refLatRad);
 	const xy = new Array(pts.length);
+	const xyBase = new Array(pts.length);
 	for (let i = 0; i < pts.length; i++) {
 		const lat = pts[i][0];
 		const lng = pts[i][1];
-		let x = (lng - clng) * C.KM_PER_DEG_LAT * cosLat;
-		let y = (lat - clat) * C.KM_PER_DEG_LAT;
+		const x0 = (lng - clng) * C.KM_PER_DEG_LAT * cosLat;
+		const y0 = (lat - clat) * C.KM_PER_DEG_LAT;
+		let x = x0;
+		let y = y0;
 		x += (hash01(i, 0) - 0.5) * jitterAmpKm;
 		y += (hash01(i, 1) - 0.5) * jitterAmpKm;
 		xy[i] = [x, y];
+		xyBase[i] = [x0, y0];
 	}
 	const maxEdgeKm = stepKm * C.DELAUNAY_MAX_EDGE_FACTOR;
 
@@ -191,7 +269,7 @@ function buildDelaunayNeighbors(pts, clat, clng, N) {
 		addNeighborEdge(neighbors, pts, c, a, maxEdgeKm);
 	}
 
-	return neighbors;
+	return { neighbors, triangles: delaunay.triangles, xy: xyBase };
 }
 
 function hash01(i, salt) {
@@ -230,6 +308,177 @@ function buildGridNeighbors(N) {
 		}
 	}
 	return neighbors;
+}
+
+function buildJitteredSites(minLat, maxLat, minLng, maxLng, clat, clng, N, stepKmHint) {
+	const sites = [];
+	const side = N + 1;
+	const stepLat = (maxLat - minLat) / side;
+	const stepLng = (maxLng - minLng) / side;
+	const jitter = clamp(C.LLOYD_JITTER_FACTOR, 0, 1);
+	const margin = (1 - jitter) * 0.5;
+
+	for (let i = 0; i < side; i++) {
+		for (let j = 0; j < side; j++) {
+			const cellMinLat = minLat + i * stepLat;
+			const cellMinLng = minLng + j * stepLng;
+			const h1 = hash01(i * side + j, 11);
+			const h2 = hash01(i * side + j, 17);
+			const lat = clamp(cellMinLat + (margin + h1 * jitter) * stepLat, minLat, maxLat);
+			const lng = clamp(cellMinLng + (margin + h2 * jitter) * stepLng, minLng, maxLng);
+			sites.push({ lat, lng });
+		}
+	}
+	return sites;
+}
+
+function lloydRelax(sites, minLat, maxLat, minLng, maxLng, clat, clng, N, stepKmHint) {
+	if (!sites || !sites.length) return sites;
+	if (C.LLOYD_ITERATIONS <= 0) return sites;
+
+	const refLatRad = clat * Math.PI / 180;
+	const cosLat = Math.cos(refLatRad);
+	const bounds = {
+		minX: (minLng - clng) * C.KM_PER_DEG_LAT * cosLat,
+		maxX: (maxLng - clng) * C.KM_PER_DEG_LAT * cosLat,
+		minY: (minLat - clat) * C.KM_PER_DEG_LAT,
+		maxY: (maxLat - clat) * C.KM_PER_DEG_LAT
+	};
+
+	const samplePts = [];
+	for (let i = 0; i <= N; i++) {
+		for (let j = 0; j <= N; j++) {
+			const lat = minLat + (i / N) * (maxLat - minLat);
+			const lng = minLng + (j / N) * (maxLng - minLng);
+			samplePts.push({
+				x: (lng - clng) * C.KM_PER_DEG_LAT * cosLat,
+				y: (lat - clat) * C.KM_PER_DEG_LAT
+			});
+		}
+	}
+
+	let xy = sitesToXy(sites, clat, clng);
+	const cellSize = stepKmHint * C.LLOYD_HASH_CELL_FACTOR;
+
+	for (let iter = 0; iter < C.LLOYD_ITERATIONS; iter++) {
+		const hash = buildSpatialHash(xy, cellSize);
+		const sumX = new Array(xy.length).fill(0);
+		const sumY = new Array(xy.length).fill(0);
+		const count = new Array(xy.length).fill(0);
+
+		for (let s = 0; s < samplePts.length; s++) {
+			const sp = samplePts[s];
+			const idx = findNearestIndex(hash, xy, cellSize, sp.x, sp.y);
+			if (idx < 0) continue;
+			sumX[idx] += sp.x;
+			sumY[idx] += sp.y;
+			count[idx] += 1;
+		}
+
+		for (let i = 0; i < xy.length; i++) {
+			if (!count[i]) continue;
+			const cx = sumX[i] / count[i];
+			const cy = sumY[i] / count[i];
+			xy[i].x = clamp(xy[i].x + (cx - xy[i].x) * C.LLOYD_ALPHA, bounds.minX, bounds.maxX);
+			xy[i].y = clamp(xy[i].y + (cy - xy[i].y) * C.LLOYD_ALPHA, bounds.minY, bounds.maxY);
+		}
+	}
+
+	return xyToSites(xy, clat, clng);
+}
+
+function sitesToXy(sites, clat, clng) {
+	const refLatRad = clat * Math.PI / 180;
+	const cosLat = Math.cos(refLatRad);
+	const xy = new Array(sites.length);
+	for (let i = 0; i < sites.length; i++) {
+		const lat = sites[i].lat;
+		const lng = sites[i].lng;
+		xy[i] = {
+			x: (lng - clng) * C.KM_PER_DEG_LAT * cosLat,
+			y: (lat - clat) * C.KM_PER_DEG_LAT
+		};
+	}
+	return xy;
+}
+
+function xyToSites(xy, clat, clng) {
+	const refLatRad = clat * Math.PI / 180;
+	const cosLat = Math.cos(refLatRad);
+	const sites = new Array(xy.length);
+	for (let i = 0; i < xy.length; i++) {
+		sites[i] = {
+			lat: clat + (xy[i].y / C.KM_PER_DEG_LAT),
+			lng: clng + (xy[i].x / (C.KM_PER_DEG_LAT * cosLat))
+		};
+	}
+	return sites;
+}
+
+function buildSpatialHash(xy, cellSize) {
+	const map = new Map();
+	for (let i = 0; i < xy.length; i++) {
+		const cx = Math.floor(xy[i].x / cellSize);
+		const cy = Math.floor(xy[i].y / cellSize);
+		const key = cx + ',' + cy;
+		let bucket = map.get(key);
+		if (!bucket) { bucket = []; map.set(key, bucket); }
+		bucket.push(i);
+	}
+	return map;
+}
+
+function findNearestIndex(hash, xy, cellSize, x, y) {
+	const cx = Math.floor(x / cellSize);
+	const cy = Math.floor(y / cellSize);
+	let bestIdx = -1;
+	let bestDist = Infinity;
+	for (let dy = -1; dy <= 1; dy++) {
+		for (let dx = -1; dx <= 1; dx++) {
+			const key = (cx + dx) + ',' + (cy + dy);
+			const bucket = hash.get(key);
+			if (!bucket) continue;
+			for (let k = 0; k < bucket.length; k++) {
+				const idx = bucket[k];
+				const dx2 = xy[idx].x - x;
+				const dy2 = xy[idx].y - y;
+				const d2 = dx2 * dx2 + dy2 * dy2;
+				if (d2 < bestDist) { bestDist = d2; bestIdx = idx; }
+			}
+		}
+	}
+	return bestIdx;
+}
+
+function sampleCostsToRaster(mesh, costs, raster) {
+	const clat = mesh.clat;
+	const clng = mesh.clng;
+	const refLatRad = clat * Math.PI / 180;
+	const cosLat = Math.cos(refLatRad);
+
+	const sitesXy = new Array(mesh.pts.length);
+	for (let i = 0; i < mesh.pts.length; i++) {
+		sitesXy[i] = {
+			x: (mesh.pts[i][1] - clng) * C.KM_PER_DEG_LAT * cosLat,
+			y: (mesh.pts[i][0] - clat) * C.KM_PER_DEG_LAT
+		};
+	}
+
+	const cellSize = Math.max(1, mesh.stepKmHint) * C.RASTER_HASH_CELL_FACTOR;
+	const hash = buildSpatialHash(sitesXy, cellSize);
+	const out = new Array(raster.pts.length).fill(Infinity);
+
+	for (let i = 0; i < raster.pts.length; i++) {
+		const lat = raster.pts[i][0];
+		const lng = raster.pts[i][1];
+		const x = (lng - clng) * C.KM_PER_DEG_LAT * cosLat;
+		const y = (lat - clat) * C.KM_PER_DEG_LAT;
+		const idx = findNearestIndex(hash, sitesXy, cellSize, x, y);
+		if (idx < 0) continue;
+		out[i] = costs[idx];
+	}
+
+	return out;
 }
 
 function isLandPoint(lat, lng) {
@@ -409,6 +658,166 @@ function computeIsoPolygon(grid, costs, maxBandKm) {
 	if (first && last && (first[0] !== last[0] || first[1] !== last[1])) ring.push([first[0], first[1]]);
 
 	return { geo: normalized, ring };
+}
+
+function computeIsoPolygonSites(mesh, costs, maxBandKm) {
+	if (!mesh || !mesh.triangles || !mesh.xy) {
+		const raster = buildRasterGrid(mesh);
+		const rasterCosts = sampleCostsToRaster(mesh, costs, raster);
+		return computeIsoPolygon(raster, rasterCosts, maxBandKm);
+	}
+	const thr = maxBandKm;
+	const outCost = thr * C.ISOBAND_UNREACHED_COST_FACTOR;
+	const tris = mesh.triangles;
+	const xy = mesh.xy;
+	const segments = [];
+
+	for (let t = 0; t < tris.length; t += 3) {
+		const a = tris[t];
+		const b = tris[t + 1];
+		const c = tris[t + 2];
+		const va0 = costs[a];
+		const vb0 = costs[b];
+		const vc0 = costs[c];
+		const va = Number.isFinite(va0) ? va0 : outCost;
+		const vb = Number.isFinite(vb0) ? vb0 : outCost;
+		const vc = Number.isFinite(vc0) ? vc0 : outCost;
+
+		const ina = va <= thr;
+		const inb = vb <= thr;
+		const inc = vc <= thr;
+		const insideCount = (ina ? 1 : 0) + (inb ? 1 : 0) + (inc ? 1 : 0);
+		if (insideCount === 0 || insideCount === 3) continue;
+
+		const pts = [];
+		addContourPoint(pts, xy[a], xy[b], va, vb, thr);
+		addContourPoint(pts, xy[b], xy[c], vb, vc, thr);
+		addContourPoint(pts, xy[c], xy[a], vc, va, thr);
+		if (pts.length === 2) segments.push([pts[0], pts[1]]);
+	}
+
+	const rings = stitchContourSegments(segments);
+	if (!rings.length) return null;
+
+	const polys = [];
+	let bestRing = null;
+	let bestArea = -Infinity;
+	for (const ringXy of rings) {
+		if (ringXy.length < C.CONTOUR_MIN_RING_POINTS) continue;
+		let ring = ringXy.map(p => xyToLngLat(mesh, p));
+		if (ring.length < C.CONTOUR_MIN_RING_POINTS) continue;
+		if (!samePoint(ring[0], ring[ring.length - 1])) ring.push(ring[0]);
+		const area = signedAreaLngLat(ring);
+		if (area < 0) ring.reverse();
+		const absArea = Math.abs(area);
+		if (absArea > bestArea) {
+			bestArea = absArea;
+			bestRing = ring;
+		}
+		polys.push([ring]);
+	}
+
+	if (!polys.length) return null;
+	const geo = polys.length === 1 ? turf.polygon(polys[0], { kind: 'sites' }) : turf.multiPolygon(polys, { kind: 'sites' });
+	return { ring: bestRing, geo };
+}
+
+function addContourPoint(out, p0, p1, v0, v1, thr) {
+	const in0 = v0 <= thr;
+	const in1 = v1 <= thr;
+	if (in0 === in1) return;
+	const dv = v1 - v0;
+	if (!dv) return;
+	const t = (thr - v0) / dv;
+	if (t <= 0 || t >= 1) return;
+	out.push([
+		p0[0] + (p1[0] - p0[0]) * t,
+		p0[1] + (p1[1] - p0[1]) * t
+	]);
+}
+
+function stitchContourSegments(segments) {
+	if (!segments.length) return [];
+	const keyScale = C.CONTOUR_KEY_SCALE;
+	const segs = new Array(segments.length);
+	const byKey = {};
+	for (let i = 0; i < segments.length; i++) {
+		const a = segments[i][0];
+		const b = segments[i][1];
+		const ka = pointKey(a, keyScale);
+		const kb = pointKey(b, keyScale);
+		segs[i] = { a, b, ka, kb, used: false };
+		if (!byKey[ka]) byKey[ka] = [];
+		if (!byKey[kb]) byKey[kb] = [];
+		byKey[ka].push(i);
+		byKey[kb].push(i);
+	}
+
+	const rings = [];
+	for (let i = 0; i < segs.length; i++) {
+		if (segs[i].used) continue;
+		const ring = [];
+		let curSeg = segs[i];
+		curSeg.used = true;
+		let startKey = curSeg.ka;
+		let prevKey = curSeg.ka;
+		let curKey = curSeg.kb;
+		ring.push(curSeg.a);
+		ring.push(curSeg.b);
+
+		let steps = 0;
+		while (curKey !== startKey && steps < C.CONTOUR_MAX_STEPS) {
+			steps++;
+			const list = byKey[curKey] || [];
+			let nextId = -1;
+			for (const sid of list) {
+				if (segs[sid].used) continue;
+				nextId = sid;
+				break;
+			}
+			if (nextId < 0) break;
+			const s = segs[nextId];
+			s.used = true;
+			const nextKey = s.ka === curKey ? s.kb : s.ka;
+			const nextPt = s.ka === curKey ? s.b : s.a;
+			ring.push(nextPt);
+			prevKey = curKey;
+			curKey = nextKey;
+		}
+
+		if (ring.length >= C.CONTOUR_MIN_RING_POINTS) rings.push(ring);
+	}
+
+	return rings;
+}
+
+function pointKey(p, scale) {
+	return String(Math.round(p[0] * scale)) + ':' + String(Math.round(p[1] * scale));
+}
+
+function xyToLngLat(mesh, p) {
+	const refLatRad = mesh.clat * Math.PI / 180;
+	const cosLat = Math.cos(refLatRad);
+	const lng = mesh.clng + (p[0] / (C.KM_PER_DEG_LAT * cosLat));
+	const lat = mesh.clat + (p[1] / C.KM_PER_DEG_LAT);
+	return [lng, lat];
+}
+
+function signedAreaLngLat(ring) {
+	let a = 0;
+	for (let i = 0; i < ring.length - 1; i++) {
+		const x0 = ring[i][0];
+		const y0 = ring[i][1];
+		const x1 = ring[i + 1][0];
+		const y1 = ring[i + 1][1];
+		a += (x0 * y1) - (x1 * y0);
+	}
+	return a * 0.5;
+}
+
+function samePoint(a, b) {
+	if (!a || !b) return false;
+	return a[0] === b[0] && a[1] === b[1];
 }
 
 function pickLargestPolygon(fc) {
