@@ -5,11 +5,69 @@
 
 // Country lookup
 
+const COUNTRY_DB_NAME		= 0;
+const COUNTRY_DB_MIN_LAT	= 1;
+const COUNTRY_DB_MAX_LAT	= 2;
+const COUNTRY_DB_MIN_LNG	= 3;
+const COUNTRY_DB_MAX_LNG	= 4;
+const COUNTRY_DB_HIGHWAY	= 5;
+const COUNTRY_DB_TERRAIN	= 6;
+
+const BBOX_MIN_LNG			= 0;
+const BBOX_MIN_LAT			= 1;
+const BBOX_MAX_LNG			= 2;
+const BBOX_MAX_LAT			= 3;
+
+let countryPolyIndex			= null;
+
+function ensureCountriesLoaded() {
+	if (countryPolyIndex) return;
+	countryPolyIndex = {};
+	if (!C.COUNTRY_POLYGONS || !C.COUNTRY_POLYGONS.length) return;
+	for (const entry of C.COUNTRY_POLYGONS) {
+		const polys = [];
+		for (const ring of entry.polys) {
+			let minLng = Infinity, minLat = Infinity, maxLng = -Infinity, maxLat = -Infinity;
+			for (const pt of ring) {
+				const lng = pt[0];
+				const lat = pt[1];
+				if (lng < minLng) minLng = lng;
+				if (lat < minLat) minLat = lat;
+				if (lng > maxLng) maxLng = lng;
+				if (lat > maxLat) maxLat = lat;
+			}
+			polys.push({
+				poly:					turf.polygon([ring]),
+				bbox:					[minLng, minLat, maxLng, maxLat],
+			});
+		}
+		countryPolyIndex[entry.name] = polys;
+	}
+}
+
+
 function countryAt(lat, lng) {
-	const hits = C.COUNTRY_DB.filter(c => lat >= c[1] && lat <= c[2] && lng >= c[3] && lng <= c[4]);
+	const hits = C.COUNTRY_DB.filter(c => lat >= c[COUNTRY_DB_MIN_LAT] && lat <= c[COUNTRY_DB_MAX_LAT] && lng >= c[COUNTRY_DB_MIN_LNG] && lng <= c[COUNTRY_DB_MAX_LNG]);
 	if (!hits.length) return null;
-	hits.sort((a, b) => ((a[2]-a[1]) * (a[4]-a[3])) - ((b[2]-b[1]) * (b[4]-b[3])));
-	return { name: hits[0][0], highway: hits[0][5], terrain: hits[0][6] };
+	ensureCountriesLoaded();
+	const p = turf.point([lng, lat]);
+	hits.sort((a, b) => ((a[COUNTRY_DB_MAX_LAT]-a[COUNTRY_DB_MIN_LAT]) * (a[COUNTRY_DB_MAX_LNG]-a[COUNTRY_DB_MIN_LNG])) - ((b[COUNTRY_DB_MAX_LAT]-b[COUNTRY_DB_MIN_LAT]) * (b[COUNTRY_DB_MAX_LNG]-b[COUNTRY_DB_MIN_LNG])));
+	for (const hit of hits) {
+		const name = hit[COUNTRY_DB_NAME];
+		const polys = countryPolyIndex ? countryPolyIndex[name] : null;
+		if (polys && polys.length) {
+			for (const item of polys) {
+				const bb = item.bbox;
+				if (lng < bb[BBOX_MIN_LNG] || lng > bb[BBOX_MAX_LNG] || lat < bb[BBOX_MIN_LAT] || lat > bb[BBOX_MAX_LAT]) continue;
+				if (turf.booleanPointInPolygon(p, item.poly)) {
+					return { name: name, highway: hit[COUNTRY_DB_HIGHWAY], terrain: hit[COUNTRY_DB_TERRAIN] };
+				}
+			}
+			continue;
+		}
+		return { name: name, highway: hit[COUNTRY_DB_HIGHWAY], terrain: hit[COUNTRY_DB_TERRAIN] };
+	}
+	return { name: hits[0][COUNTRY_DB_NAME], highway: hits[0][COUNTRY_DB_HIGHWAY], terrain: hits[0][COUNTRY_DB_TERRAIN] };
 }
 
 

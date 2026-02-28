@@ -103,9 +103,24 @@ C.COUNTRY_DB = [
 	['Sweden',			55.3, 69.1,	11.1,	24.2,	120, 'rolling'],
 	['Switzerland',	 	45.8, 47.9,	 5.9,	10.5,	120, 'mountain'],
 	['Turkey',			35.8, 42.1,	26.0,	44.8,	120, 'rolling'],
+	['Morocco',			21.420734, 35.759988,	-17.020428,	-1.124551,	120, 'rolling'],
+	['Algeria',			19.057364, 37.118381,	 -8.6844,	11.999506,	120, 'rolling'],
+	['Tunisia',			30.307556, 37.349994,	 7.524482,	11.488787,	110, 'flat'],
+	['Libya',			19.58047, 33.136996,	 9.319411,	25.16482,	120, 'flat'],
+	['Egypt',			22.0, 31.58568,	24.70007,	36.86623,	120, 'flat'],
+	['Israel',			29.501326, 33.277426,	34.265433,	35.836397,	110, 'hilly'],
+	['Palestine',		31.353435, 32.532511,	34.927408,	35.545665,	110, 'hilly'],
+	['Jordan',			29.197495, 33.378686,	34.922603,	39.195468,	120, 'rolling'],
+	['Lebanon',			33.08904, 34.644914,	35.126053,	36.61175,	110, 'mountain'],
+	['Syria',			32.312938, 37.229873,	35.700798,	42.349591,	120, 'rolling'],
+	['W. Sahara',		20.999752, 27.656426,	-17.063423,	-8.665124,	110, 'flat'],
 	['Ukraine',			44.4, 52.4,	22.1,	40.2,	130, 'rolling'],
 	['UK',				49.9, 60.9,	-8.2,	 2.0,	112, 'rolling'],
 ];
+
+// Country polygons are loaded from country-polygons.js in the browser.
+C.COUNTRY_POLYGONS			= [];
+
 
 // Crossing zones as bounding boxes: [name, minLat, maxLat, minLng, maxLng]
 C.CROSSING_ZONES = [
