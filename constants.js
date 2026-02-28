@@ -1,4 +1,4 @@
-// constants.js — single source of truth for all tuneable values.
+// constants.js - single source of truth for all tuneable values.
 // Loaded via script tag in the browser and importScripts() in the worker.
 
 const C = {}; 
@@ -24,7 +24,7 @@ C.GRID_SIZE_DIVISOR			= 10;		// N = clamp(outerKm / divisor, min, max)
 C.GRID_SIZE_MIN				= 20;
 C.GRID_SIZE_MAX				= 90;
 
-// Tortuosity: tau_terrain — road sinuosity added by elevation relief.
+// Tortuosity: tau_terrain - road sinuosity added by elevation relief.
 // Values from Ballou 2002, Boscoe 2012, Weiss 2018 / EEA CORINE 2018.
 C.TERRAIN_TORTUOSITY = {
 	flat					: 1.00,	// under 50m per 10km, near-straight roads
@@ -33,7 +33,7 @@ C.TERRAIN_TORTUOSITY = {
 	mountain				: 1.45,	// over 500m, switchbacks and alpine passes
 };
 
-// Tortuosity: tau_mode — network constraint per mode.
+// Tortuosity: tau_mode - network constraint per mode.
 // Values from Giacomin & Levinson 2015, Millward et al 2013.
 C.MODE_TORTUOSITY = {
 	walk					: 1.05,
@@ -118,6 +118,101 @@ C.CROSSING_ZONES = [
 	['Irish Sea South',		51.7,	52.25, -5.3,	-4.6],	// Fishguard/Pembroke to Rosslare
 	['Strait of Messina',	37.8,	38.5,	15.3,	15.75], // mainland Italy to Sicily
 	['Strait of Gibraltar',	35.8,	36.2,	-5.5,	-5.2],	// Algeciras to Ceuta
+];
+
+// Crossing polygons improve accuracy over bounding boxes.
+// Format: [name, [ring, ring, ...]] where ring is an array of [lng, lat].
+// Use CROSSING_ZONES as a fallback if polygons are missing.
+C.CROSSING_POLYGONS = [
+	['English Channel', [
+		[
+			[-1.95, 50.75],
+			[ 1.95, 50.75],
+			[ 1.95, 51.35],
+			[-1.95, 51.35],
+			[-1.95, 50.75],
+		],
+		[
+			[-5.90, 49.85],
+			[-1.10, 49.85],
+			[-1.10, 50.75],
+			[-5.90, 50.75],
+			[-5.90, 49.85],
+		],
+	]],
+
+	['Oresund', [
+		[
+			[12.40, 55.45],
+			[13.25, 55.45],
+			[13.25, 56.15],
+			[12.40, 56.15],
+			[12.40, 55.45],
+		],
+	]],
+	['Great Belt', [
+		[
+			[10.55, 55.05],
+			[11.40, 55.05],
+			[11.40, 55.65],
+			[10.55, 55.65],
+			[10.55, 55.05],
+		],
+	]],
+	['Fehmarn Belt', [
+		[
+			[10.65, 54.35],
+			[11.65, 54.35],
+			[11.65, 55.00],
+			[10.65, 55.00],
+			[10.65, 54.35],
+		],
+	]],
+	['Irish Sea North', [
+		[
+			[-6.25, 54.55],
+			[-4.55, 54.55],
+			[-4.55, 55.35],
+			[-6.25, 55.35],
+			[-6.25, 54.55],
+		],
+	]],
+	['Irish Sea Central', [
+		[
+			[-6.65, 53.00],
+			[-4.25, 53.00],
+			[-4.25, 53.65],
+			[-6.65, 53.65],
+			[-6.65, 53.00],
+		],
+	]],
+	['Irish Sea South', [
+		[
+			[-5.40, 51.60],
+			[-4.45, 51.60],
+			[-4.45, 52.35],
+			[-5.40, 52.35],
+			[-5.40, 51.60],
+		],
+	]],
+	['Strait of Messina', [
+		[
+			[15.20, 37.75],
+			[15.85, 37.75],
+			[15.85, 38.55],
+			[15.20, 38.55],
+			[15.20, 37.75],
+		],
+	]],
+	['Strait of Gibraltar', [
+		[
+			[-5.65, 35.70],
+			[-5.05, 35.70],
+			[-5.05, 36.30],
+			[-5.65, 36.30],
+			[-5.65, 35.70],
+		],
+	]],
 ];
 
 // External data and geocoding
