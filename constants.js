@@ -28,7 +28,7 @@ C.DELAUNAY_JITTER_HASH_B		= 43758.5453;
 C.DELAUNAY_JITTER_SALT_STEP		= 1013;
 
 // Ferry/bridge crossings consume more budget to model slower effective speed.
-C.CROSSING_DISTANCE_FACTOR		= 1.5;
+C.CROSSING_DISTANCE_FACTOR		= 1.25;
 
 // Land grid
 C.GRID_MARGIN_FACTOR			= 0.2;	 // padding around outer radius bounding box as a fraction
