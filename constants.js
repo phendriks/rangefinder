@@ -3,17 +3,17 @@
 
 const C = {}; 
 
-C.VECTOR_COUNT				= 90;
-C.VECTOR_STEP_DEG			= 360 / C.VECTOR_COUNT;
+C.VECTOR_COUNT					= 90;
+C.VECTOR_STEP_DEG				= 360 / C.VECTOR_COUNT;
 
-C.CELL_WATER				= 0;
-C.CELL_LAND					= 1;
-C.CELL_CROSSING				= 2;
+C.CELL_WATER					= 0;
+C.CELL_LAND						= 1;
+C.CELL_CROSSING					= 2;
 
-C.NEIGHBOR_MODE_8			= true;
-C.DISTANCE_UNITS			= 'kilometers';
+C.NEIGHBOR_MODE_8				= true;
+C.DISTANCE_UNITS				= 'kilometers';
 
-C.EXTRACTION_STEPS_DIVISOR	= 120;
+C.EXTRACTION_STEPS_DIVISOR		= 120;
 
 // Geodesy
 C.EARTH_RADIUS_KM				= 6371;
@@ -101,11 +101,11 @@ C.MODE_SPEED_KMH = {
 };
 
 C.MODE_NOTE = {
-	drive: '105 km/h base, tau_mode 1.20 (Giacomin & Levinson 2015)',
-	moto:	'100 km/h base, tau_mode 1.15, filters traffic and handles mountain passes better',
-	cycle: '18 km/h base, tau_mode 1.08 (Millward et al. 2013)',
-	run:	 '10 km/h base, tau_mode 1.05, open land accessible',
-	walk:	'5 km/h base, tau_mode 1.05, open land accessible',
+	drive	: '105 km/h base, tau_mode 1.20 (Giacomin & Levinson 2015)',
+	moto	: '100 km/h base, tau_mode 1.15, filters traffic and handles mountain passes better',
+	cycle	: '18 km/h base, tau_mode 1.08 (Millward et al. 2013)',
+	run		: '10 km/h base, tau_mode 1.05, open land accessible',
+	walk	: '5 km/h base, tau_mode 1.05, open land accessible',
 };
 
 // Country database: [name, minLat, maxLat, minLng, maxLng, highwayKmh, defaultTerrain]
