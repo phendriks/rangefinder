@@ -710,6 +710,7 @@ function computeIsoPolygonSites(mesh, costs, maxBandKm) {
 		if (!samePoint(ring[0], ring[ring.length - 1])) ring.push(ring[0]);
 		const area = signedAreaLngLat(ring);
 		if (area < 0) ring.reverse();
+		ring = beautifyRing(ring, mesh);
 		const absArea = Math.abs(area);
 		if (absArea > bestArea) {
 			bestArea = absArea;
@@ -819,6 +820,76 @@ function signedAreaLngLat(ring) {
 function samePoint(a, b) {
 	if (!a || !b) return false;
 	return a[0] === b[0] && a[1] === b[1];
+}
+
+
+function beautifyRing(ring, mesh) {
+	if (!ring || ring.length < C.CONTOUR_MIN_RING_POINTS) return ring;
+
+	const orig = ring;
+	let ringXy = ring.map(p => lngLatToXy(mesh, p));
+
+	ringXy = simplifyRingXy(ringXy, C.CONTOUR_SIMPLIFY_MIN_KM);
+	for (let i = 0; i < C.CONTOUR_SMOOTH_ITERATIONS; i++) {
+		ringXy = chaikinSmoothClosed(ringXy);
+	}
+	let out = ringXy.map(p => xyToLngLat(mesh, p));
+
+	if (out.length < C.CONTOUR_MIN_RING_POINTS) return orig;
+	if (!samePoint(out[0], out[out.length - 1])) out.push(out[0]);
+
+	const poly0 = turf.polygon([orig]);
+	const poly1 = turf.polygon([out]);
+
+	if (turf.kinks(poly1).features.length) return orig;
+
+	const a0 = turf.area(poly0);
+	const a1 = turf.area(poly1);
+	if (!a0 || !a1) return orig;
+	const ratio = a1 / a0;
+	if (ratio < C.CONTOUR_AREA_RATIO_MIN || ratio > C.CONTOUR_AREA_RATIO_MAX) return orig;
+
+	return out;
+}
+
+function lngLatToXy(mesh, p) {
+	const refLatRad = mesh.clat * Math.PI / 180;
+	const cosLat = Math.cos(refLatRad);
+	const x = (p[0] - mesh.clng) * (C.KM_PER_DEG_LAT * cosLat);
+	const y = (p[1] - mesh.clat) * C.KM_PER_DEG_LAT;
+	return [x, y];
+}
+
+function simplifyRingXy(ringXy, minKm) {
+	if (!ringXy || ringXy.length < 4) return ringXy;
+	const out = [ringXy[0]];
+	for (let i = 1; i < ringXy.length; i++) {
+		const prev = out[out.length - 1];
+		const cur = ringXy[i];
+		if (distKmXy(prev, cur) >= minKm) out.push(cur);
+	}
+	if (out.length < 4) return ringXy;
+	if (!samePoint(out[0], out[out.length - 1])) out.push(out[0]);
+	return out;
+}
+
+function distKmXy(a, b) {
+	const dx = a[0] - b[0];
+	const dy = a[1] - b[1];
+	return Math.sqrt((dx * dx) + (dy * dy));
+}
+
+function chaikinSmoothClosed(ringXy) {
+	if (!ringXy || ringXy.length < 4) return ringXy;
+	const out = [];
+	for (let i = 0; i < ringXy.length - 1; i++) {
+		const p0 = ringXy[i];
+		const p1 = ringXy[i + 1];
+		out.push([0.75 * p0[0] + 0.25 * p1[0], 0.75 * p0[1] + 0.25 * p1[1]]);
+		out.push([0.25 * p0[0] + 0.75 * p1[0], 0.25 * p0[1] + 0.75 * p1[1]]);
+	}
+	out.push(out[0]);
+	return out;
 }
 
 function pickLargestPolygon(fc) {

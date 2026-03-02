@@ -67,6 +67,10 @@ C.RASTER_HASH_CELL_FACTOR		= 2.0;
 C.CONTOUR_KEY_SCALE				= 1000;
 C.CONTOUR_MAX_STEPS				= 200000;
 C.CONTOUR_MIN_RING_POINTS		= 4;
+C.CONTOUR_SIMPLIFY_MIN_KM		= 1.2;
+C.CONTOUR_SMOOTH_ITERATIONS		= 1;
+C.CONTOUR_AREA_RATIO_MIN		= 0.85;
+C.CONTOUR_AREA_RATIO_MAX		= 1.15;
 
 // Tortuosity: tau_terrain - road sinuosity added by elevation relief.
 // Values from Ballou 2002, Boscoe 2012, Weiss 2018 / EEA CORINE 2018.
