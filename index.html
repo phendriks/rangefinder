@@ -348,40 +348,13 @@
 	<!-- Options -->
 		<div class="opts-row">
 			<input type="checkbox" id="show-grid" unchecked>
-			<label for="show-grid">Show land grid</label>
+			<label for="show-grid">Show point grid</label>
 			&nbsp;
 			<input type="checkbox" id="show-pts" unchecked>
-			<label for="show-pts">Show endpoints</label>
+			<label for="show-pts">Show route ends</label>
 			&nbsp;
 			<input type="checkbox" id="dbg" unchecked>
 			<label for="dbg">Debug</label>
-		</div>
-
-		<!-- DEBUG Context panel (shown after geocoding) -->
-		<div id="ctx">
-			<hr class="dv">
-			<label class="lbl">Route Context</label>
-			<div class="cr">
-				<span class="cl">Country</span>
-				<span class="cb" id="ctx-country">—</span>
-				<span class="cb" id="ctx-limit" style="color:var(--ac)">—</span>
-			</div>
-			<div class="cr">
-				<span class="cl">Terrain</span>
-				<select class="cs" id="ctx-terrain">
-					<option value="flat">Flat (&lt;50 m / 10 km)</option>
-					<option value="rolling" selected>Rolling (50–200 m)</option>
-					<option value="hilly">Hilly (200–500 m)</option>
-					<option value="mountain">Mountainous (&gt;500 m)</option>
-				</select>
-			</div>
-			<table class="ft">
-				<tr><td>τ_mode</td><td id="ft-m">—</td></tr>
-				<tr><td>τ_terrain</td><td id="ft-t">—</td></tr>
-				<tr><td>Total tortuosity</td><td id="ft-tot" class="hi">—</td></tr>
-				<tr><td style="padding-top:3px">Effective speed</td><td id="ft-spd" class="hi">—</td></tr>
-			</table>
-			<hr class="dv">
 		</div>
 
 		<!-- Toggle -->
@@ -429,6 +402,33 @@
 		</div>
 
 		<button id="calc">Show Range</button>
+
+		<!-- DEBUG Context panel (shown after geocoding) -->
+		<div id="ctx">
+			<hr class="dv">
+			<label class="lbl">Route Context</label>
+			<div class="cr">
+				<span class="cl">Country</span>
+				<span class="cb" id="ctx-country">—</span>
+				<span class="cb" id="ctx-limit" style="color:var(--ac)">—</span>
+			</div>
+			<div class="cr">
+				<span class="cl">Terrain</span>
+				<select class="cs" id="ctx-terrain">
+					<option value="flat">Flat (&lt;50 m / 10 km)</option>
+					<option value="rolling" selected>Rolling (50–200 m)</option>
+					<option value="hilly">Hilly (200–500 m)</option>
+					<option value="mountain">Mountainous (&gt;500 m)</option>
+				</select>
+			</div>
+			<table class="ft">
+				<tr><td>τ_mode</td><td id="ft-m">—</td></tr>
+				<tr><td>τ_terrain</td><td id="ft-t">—</td></tr>
+				<tr><td>Total tortuosity</td><td id="ft-tot" class="hi">—</td></tr>
+				<tr><td style="padding-top:3px">Effective speed</td><td id="ft-spd" class="hi">—</td></tr>
+			</table>
+			<hr class="dv">
+		</div>
 
 		<!-- Progress -->
 		<div id="status-area">
