@@ -3,17 +3,17 @@
 
 const C = {}; 
 
-C.VECTOR_COUNT					= 90;
-C.VECTOR_STEP_DEG				= 360 / C.VECTOR_COUNT;
+C.VECTOR_COUNT				= 90;
+C.VECTOR_STEP_DEG			= 360 / C.VECTOR_COUNT;
 
-C.CELL_WATER					= 0;
-C.CELL_LAND						= 1;
-C.CELL_CROSSING					= 2;
+C.CELL_WATER				= 0;
+C.CELL_LAND					= 1;
+C.CELL_CROSSING				= 2;
 
-C.NEIGHBOR_MODE_8				= true;
-C.DISTANCE_UNITS				= 'kilometers';
+C.NEIGHBOR_MODE_8			= true;
+C.DISTANCE_UNITS			= 'kilometers';
 
-C.EXTRACTION_STEPS_DIVISOR		= 120;
+C.EXTRACTION_STEPS_DIVISOR	= 120;
 
 // Geodesy
 C.EARTH_RADIUS_KM				= 6371;
@@ -42,23 +42,23 @@ C.GRID_SIZE_MIN					= 20;
 C.GRID_SIZE_MAX					= 90;
 C.GRID_SIZE_BONUS				= 2;
 
-C.GRID_DOT_RADIUS					= 1;
+C.GRID_DOT_RADIUS					= 2;
 C.GRID_DOT_RADIUS_CROSSING_BONUS	= 1;
 
 C.SITE_COLOUR_LAND				= '#28a050';
 C.SITE_COLOUR_CROSSING			= '#e08020';
 C.SITE_COLOUR_WATER				= '#2b6cc4';
 
-C.SITE_FILL_OPACITY_LAND		= 0.6;
-C.SITE_FILL_OPACITY_CROSSING	= 0.6;
-C.SITE_FILL_OPACITY_WATER		= 0.4;
+C.SITE_FILL_OPACITY_LAND		= 0.55;
+C.SITE_FILL_OPACITY_CROSSING	= 0.55;
+C.SITE_FILL_OPACITY_WATER		= 0.25;
 
 // Phase 5 sampling
 
 C.LLOYD_ITERATIONS				= 2;
-C.LLOYD_ALPHA					= .1;
-C.LLOYD_JITTER_FACTOR			= .9;
-C.LLOYD_HASH_CELL_FACTOR		= 2.5;
+C.LLOYD_ALPHA					= 0.2;
+C.LLOYD_JITTER_FACTOR			= .75;
+C.LLOYD_HASH_CELL_FACTOR		= 1.6;
 
 C.RASTER_HASH_CELL_FACTOR		= 2.0;
 
@@ -71,34 +71,34 @@ C.CONTOUR_MIN_RING_POINTS		= 4;
 // Tortuosity: tau_terrain - road sinuosity added by elevation relief.
 // Values from Ballou 2002, Boscoe 2012, Weiss 2018 / EEA CORINE 2018.
 C.TERRAIN_TORTUOSITY = {
-	flat					: 1.00,	// under 50m per 10km, near-straight roads
-	rolling					: 1.08,	// 50 to 200m, gentle curves
-	hilly					: 1.22,	// 200 to 500m, valley crossings and ridge detours
-	mountain				: 1.45,	// over 500m, switchbacks and alpine passes
+	flat						: 1.00,	// under 50m per 10km, near-straight roads
+	rolling						: 1.08,	// 50 to 200m, gentle curves
+	hilly						: 1.22,	// 200 to 500m, valley crossings and ridge detours
+	mountain					: 1.45,	// over 500m, switchbacks and alpine passes
 };
 
 // Tortuosity: tau_mode - network constraint per mode.
 // Values from Giacomin & Levinson 2015, Millward et al 2013.
 C.MODE_TORTUOSITY = {
-	walk					: 1.05,
-	run						: 1.05,
-	cycle					: 1.08,
-	moto					: 1.15,
-	drive					: 1.20,
+	walk						: 1.05,
+	run							: 1.05,
+	cycle						: 1.08,
+	moto						: 1.15,
+	drive						: 1.20,
 };
 
-// Base speeds calibrated against real drives: 115 / (1.20 * 1.08) = 88.7 km/h crow-flies.
+// Base speeds (APPROXIMATION) calibrated against real drives
 C.MODE_SPEED_KMH = {
-	drive:	115,
-	moto:	115,
-	cycle:	18,
-	run:	10,
-	walk:	5,
+	drive						: 105,
+	moto						: 100,
+	cycle						: 18,
+	run							: 10,
+	walk						: 5,
 };
 
 C.MODE_NOTE = {
-	drive: '115 km/h base, tau_mode 1.20 (Giacomin & Levinson 2015)',
-	moto:	'115 km/h base, tau_mode 1.15, filters traffic and handles mountain passes better',
+	drive: '105 km/h base, tau_mode 1.20 (Giacomin & Levinson 2015)',
+	moto:	'100 km/h base, tau_mode 1.15, filters traffic and handles mountain passes better',
 	cycle: '18 km/h base, tau_mode 1.08 (Millward et al. 2013)',
 	run:	 '10 km/h base, tau_mode 1.05, open land accessible',
 	walk:	'5 km/h base, tau_mode 1.05, open land accessible',
@@ -147,17 +147,17 @@ C.COUNTRY_DB = [
 	['Sweden',			55.3, 69.1,	11.1,	24.2,	120, 'rolling'],
 	['Switzerland',	 	45.8, 47.9,	 5.9,	10.5,	120, 'mountain'],
 	['Turkey',			35.8, 42.1,	26.0,	44.8,	120, 'rolling'],
-	['Morocco',			21.420734, 35.759988,	-17.020428,	-1.124551,	120, 'rolling'],
-	['Algeria',			19.057364, 37.118381,	 -8.6844,	11.999506,	120, 'rolling'],
-	['Tunisia',			30.307556, 37.349994,	 7.524482,	11.488787,	110, 'flat'],
-	['Libya',			19.58047, 33.136996,	 9.319411,	25.16482,	120, 'flat'],
-	['Egypt',			22.0, 31.58568,	24.70007,	36.86623,	120, 'flat'],
-	['Israel',			29.501326, 33.277426,	34.265433,	35.836397,	110, 'hilly'],
-	['Palestine',		31.353435, 32.532511,	34.927408,	35.545665,	110, 'hilly'],
-	['Jordan',			29.197495, 33.378686,	34.922603,	39.195468,	120, 'rolling'],
-	['Lebanon',			33.08904, 34.644914,	35.126053,	36.61175,	110, 'mountain'],
-	['Syria',			32.312938, 37.229873,	35.700798,	42.349591,	120, 'rolling'],
-	['W. Sahara',		20.999752, 27.656426,	-17.063423,	-8.665124,	110, 'flat'],
+	['Morocco',			21.4, 35.7,	-17.0,	-1.1,	120, 'rolling'],
+	['Algeria',			19.0, 37.1,	 -8.6,	11.9,	120, 'rolling'],
+	['Tunisia',			30.3, 37.3,	 7.5,	11.4,	110, 'flat'],
+	['Libya',			19.5, 33.1,	 9.3,	25.1,	120, 'flat'],
+	['Egypt',			22.0, 31.5,	24.7,	36.8,	120, 'flat'],
+	['Israel',			29.5, 33.2,	34.2,	35.8,	110, 'hilly'],
+	['Palestine',		31.3, 32.5,	34.9,	35.5,	110, 'hilly'],
+	['Jordan',			29.1, 33.3,	34.9,	39.1,	120, 'rolling'],
+	['Lebanon',			33.0, 34.6,	35.1,	36.6,	110, 'mountain'],
+	['Syria',			32.3, 37.2,	35.7,	42.3,	120, 'rolling'],
+	['W. Sahara',		20.9, 27.6,	-17.0,	-8.6,	110, 'flat'],
 	['Ukraine',			44.4, 52.4,	22.1,	40.2,	130, 'rolling'],
 	['UK',				49.9, 60.9,	-8.2,	 2.0,	112, 'rolling'],
 ];
@@ -182,97 +182,8 @@ C.CROSSING_ZONES = [
 // Crossing polygons improve accuracy over bounding boxes.
 // Format: [name, [ring, ring, ...]] where ring is an array of [lng, lat].
 // Use CROSSING_ZONES as a fallback if polygons are missing.
-C.CROSSING_POLYGONS = [
-	['English Channel', [
-		[
-			[-1.95, 50.75],
-			[ 1.95, 50.75],
-			[ 1.95, 51.35],
-			[-1.95, 51.35],
-			[-1.95, 50.75],
-		],
-		[
-			[-5.90, 49.85],
-			[-1.10, 49.85],
-			[-1.10, 50.75],
-			[-5.90, 50.75],
-			[-5.90, 49.85],
-		],
-	]],
-
-	['Oresund', [
-		[
-			[12.40, 55.45],
-			[13.25, 55.45],
-			[13.25, 56.15],
-			[12.40, 56.15],
-			[12.40, 55.45],
-		],
-	]],
-	['Great Belt', [
-		[
-			[10.55, 55.05],
-			[11.40, 55.05],
-			[11.40, 55.65],
-			[10.55, 55.65],
-			[10.55, 55.05],
-		],
-	]],
-	['Fehmarn Belt', [
-		[
-			[10.65, 54.35],
-			[11.65, 54.35],
-			[11.65, 55.00],
-			[10.65, 55.00],
-			[10.65, 54.35],
-		],
-	]],
-	['Irish Sea North', [
-		[
-			[-6.25, 54.55],
-			[-4.55, 54.55],
-			[-4.55, 55.35],
-			[-6.25, 55.35],
-			[-6.25, 54.55],
-		],
-	]],
-	['Irish Sea Central', [
-		[
-			[-6.65, 53.00],
-			[-4.25, 53.00],
-			[-4.25, 53.65],
-			[-6.65, 53.65],
-			[-6.65, 53.00],
-		],
-	]],
-	['Irish Sea South', [
-		[
-			[-5.40, 51.60],
-			[-4.45, 51.60],
-			[-4.45, 52.35],
-			[-5.40, 52.35],
-			[-5.40, 51.60],
-		],
-	]],
-	['Strait of Messina', [
-		[
-			[15.20, 37.75],
-			[15.85, 37.75],
-			[15.85, 38.55],
-			[15.20, 38.55],
-			[15.20, 37.75],
-		],
-	]],
-	['Strait of Gibraltar', [
-		[
-			[-5.65, 35.70],
-			[-5.05, 35.70],
-			[-5.05, 36.30],
-			[-5.65, 36.30],
-			[-5.65, 35.70],
-		],
-	]],
-];
+// Crossing polygons moved to crossing-polygons.js
+C.CROSSING_POLYGONS = [];
 
 // External data and geocoding
 

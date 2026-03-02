@@ -7,6 +7,7 @@ importScripts('https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js');
 importScripts('https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js');
 importScripts('https://cdn.jsdelivr.net/npm/delaunator@5/delaunator.min.js');
 importScripts('constants.js');
+importScripts('crossing-polygons.js');
 
 let landFeatures = null; // FeatureCollection of land polygons
 let crossingFeatures = null; // Array of crossing polygons
