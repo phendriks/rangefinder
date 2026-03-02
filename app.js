@@ -5,27 +5,25 @@
 
 // Country lookup
 
-const COUNTRY_DB_NAME		= 0;
-const COUNTRY_DB_MIN_LAT	= 1;
-const COUNTRY_DB_MAX_LAT	= 2;
-const COUNTRY_DB_MIN_LNG	= 3;
-const COUNTRY_DB_MAX_LNG	= 4;
-const COUNTRY_DB_HIGHWAY	= 5;
-const COUNTRY_DB_TERRAIN	= 6;
-
 const BBOX_MIN_LNG			= 0;
 const BBOX_MIN_LAT			= 1;
 const BBOX_MAX_LNG			= 2;
 const BBOX_MAX_LAT			= 3;
 
 let countryPolyIndex			= null;
+let countryBoundsIndex			= null;
+let countryNameList				= null;
+let countryPropsCache			= null;
 
 function ensureCountriesLoaded() {
 	if (countryPolyIndex) return;
 	countryPolyIndex = {};
+	countryBoundsIndex = {};
+	countryNameList = [];
 	if (!C.COUNTRY_POLYGONS || !C.COUNTRY_POLYGONS.length) return;
 	for (const entry of C.COUNTRY_POLYGONS) {
 		const polys = [];
+		let cMinLng = Infinity, cMinLat = Infinity, cMaxLng = -Infinity, cMaxLat = -Infinity;
 		for (const ring of entry.polys) {
 			let minLng = Infinity, minLat = Infinity, maxLng = -Infinity, maxLat = -Infinity;
 			for (const pt of ring) {
@@ -36,47 +34,122 @@ function ensureCountriesLoaded() {
 				if (lng > maxLng) maxLng = lng;
 				if (lat > maxLat) maxLat = lat;
 			}
+			if (minLng < cMinLng) cMinLng = minLng;
+			if (minLat < cMinLat) cMinLat = minLat;
+			if (maxLng > cMaxLng) cMaxLng = maxLng;
+			if (maxLat > cMaxLat) cMaxLat = maxLat;
 			polys.push({
 				poly:					turf.polygon([ring]),
 				bbox:					[minLng, minLat, maxLng, maxLat],
 			});
 		}
 		countryPolyIndex[entry.name] = polys;
+		countryNameList.push(entry.name);
+		if (cMinLng !== Infinity) {
+			countryBoundsIndex[entry.name] = [cMinLng, cMinLat, cMaxLng, cMaxLat];
+		}
 	}
+}
+
+function getCountryProps(name) {
+	if (!countryPropsCache) countryPropsCache = {};
+	let props = countryPropsCache[name];
+	if (props) return props;
+	const d = C.COUNTRY_PROPS_DEFAULTS || {};
+	const o = (C.COUNTRY_PROPS_OVERRIDES && C.COUNTRY_PROPS_OVERRIDES[name]) || null;
+	props = {
+		highway						: d.highway,
+		terrain						: d.terrain,
+	};
+	if (o) {
+		if (o.highway !== undefined) props.highway = o.highway;
+		if (o.terrain !== undefined) props.terrain = o.terrain;
+	}
+	countryPropsCache[name] = props;
+	return props;
+}
+
+function getCountryBboxArea(name) {
+	if (!countryBoundsIndex) return Infinity;
+	const bb = countryBoundsIndex[name];
+	if (!bb) return Infinity;
+	return (bb[BBOX_MAX_LNG] - bb[BBOX_MIN_LNG]) * (bb[BBOX_MAX_LAT] - bb[BBOX_MIN_LAT]);
 }
 
 
 function countryAt(lat, lng) {
-	const hits = C.COUNTRY_DB.filter(c => lat >= c[COUNTRY_DB_MIN_LAT] && lat <= c[COUNTRY_DB_MAX_LAT] && lng >= c[COUNTRY_DB_MIN_LNG] && lng <= c[COUNTRY_DB_MAX_LNG]);
-	if (!hits.length) return null;
 	ensureCountriesLoaded();
+	const hits = [];
+	const names = countryNameList || [];
+	for (const name of names) {
+		const bb = countryBoundsIndex ? countryBoundsIndex[name] : null;
+		if (bb) {
+			if (lng < bb[BBOX_MIN_LNG] || lng > bb[BBOX_MAX_LNG] || lat < bb[BBOX_MIN_LAT] || lat > bb[BBOX_MAX_LAT]) continue;
+		}
+		hits.push(name);
+	}
+	if (!hits.length) return null;
 	const p = turf.point([lng, lat]);
-	hits.sort((a, b) => ((a[COUNTRY_DB_MAX_LAT]-a[COUNTRY_DB_MIN_LAT]) * (a[COUNTRY_DB_MAX_LNG]-a[COUNTRY_DB_MIN_LNG])) - ((b[COUNTRY_DB_MAX_LAT]-b[COUNTRY_DB_MIN_LAT]) * (b[COUNTRY_DB_MAX_LNG]-b[COUNTRY_DB_MIN_LNG])));
+	hits.sort((a, b) => getCountryBboxArea(a) - getCountryBboxArea(b));
 	for (const hit of hits) {
-		const name = hit[COUNTRY_DB_NAME];
+		const name = hit;
 		const polys = countryPolyIndex ? countryPolyIndex[name] : null;
+		const props = getCountryProps(name);
 		if (polys && polys.length) {
 			for (const item of polys) {
 				const bb = item.bbox;
 				if (lng < bb[BBOX_MIN_LNG] || lng > bb[BBOX_MAX_LNG] || lat < bb[BBOX_MIN_LAT] || lat > bb[BBOX_MAX_LAT]) continue;
 				if (turf.booleanPointInPolygon(p, item.poly)) {
-					return { name: name, highway: hit[COUNTRY_DB_HIGHWAY], terrain: hit[COUNTRY_DB_TERRAIN] };
+					return { name: name, highway: props.highway, terrain: props.terrain };
 				}
 			}
 			continue;
 		}
-		return { name: name, highway: hit[COUNTRY_DB_HIGHWAY], terrain: hit[COUNTRY_DB_TERRAIN] };
+		return { name: name, highway: props.highway, terrain: props.terrain };
 	}
-	return { name: hits[0][COUNTRY_DB_NAME], highway: hits[0][COUNTRY_DB_HIGHWAY], terrain: hits[0][COUNTRY_DB_TERRAIN] };
+	const fallbackName = hits[0];
+	const fallbackProps = getCountryProps(fallbackName);
+	return { name: fallbackName, highway: fallbackProps.highway, terrain: fallbackProps.terrain };
 }
+
+function runCountryRegression() {
+	if (!C.DEBUG_COUNTRY_REGRESSION) return;
+	const pts = [
+		[48.8566, 2.3522],
+		[52.5200, 13.4050],
+		[41.9028, 12.4964],
+		[40.4168, -3.7038],
+		[48.2082, 16.3738],
+		[50.8503, 4.3517],
+		[47.2692, 11.4041],
+		[42.8782, -8.5448],
+		[51.5074, -0.1278],
+		[53.3498, -6.2603],
+		[37.5079, 15.0830],
+		[55.6761, 12.5683],
+		[36.1408, -5.3536],
+		[38.1157, 13.3615],
+		[46.2044, 6.1432],
+		[45.4642, 9.1900],
+		[0.0, 0.0],
+	];
+	const out = [];
+	for (const pt of pts) {
+		const c = countryAt(pt[0], pt[1]);
+		out.push(c ? (c.name + ':' + c.highway + ':' + c.terrain) : 'null');
+	}
+	console.log('countryRegression', out.join('|'));
+}
+
+runCountryRegression();
 
 
 // Map setup
 
-const map = L.map('map', { center: [48, 10], zoom: 5, zoomControl: false });
+const map = L.map('map', { center: C.MAP_INITIAL_CENTER, zoom: C.MAP_INITIAL_ZOOM, zoomControl: false });
 L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-const canvasRenderer = L.canvas({ padding: 0.5 });
+const canvasRenderer = L.canvas({ padding: C.CANVAS_PADDING });
 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
 	{maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}
@@ -84,13 +157,13 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
 
 // Desktop: CSS already gives the map a 300px left margin via the sidebar width.
 // Mobile: CSS removes that margin; the bottom sheet overlays the full-screen map.
-const isMobile = () => window.innerWidth < 640;
+const isMobile = () => window.innerWidth < C.MOBILE_BREAKPOINT_PX;
 
-if (!isMobile()) {document.getElementById('map').style.marginLeft = '300px';}
+if (!isMobile()) {document.getElementById('map').style.marginLeft = C.SIDEBAR_WIDTH_PX + 'px';}
 map.invalidateSize();
 
 // Recompute map margin if window is resized across the breakpoint
-window.addEventListener('resize', () => {document.getElementById('map').style.marginLeft = isMobile() ? '' : '300px'; map.invalidateSize();});
+window.addEventListener('resize', () => {document.getElementById('map').style.marginLeft = isMobile() ? '' : (C.SIDEBAR_WIDTH_PX + 'px'); map.invalidateSize();});
 
 
 // State
@@ -262,7 +335,7 @@ const sugEl = document.getElementById('sug');
 locEl.addEventListener('input', () => {
 	clearTimeout(searchTimer);
 	const q = locEl.value.trim();
-	if (q.length < 3) { hideSug(); return; }
+	if (q.length < C.GEOCODE_MIN_QUERY_LENGTH) { hideSug(); return; }
 	if (q === lastQuery) return;
 	searchTimer = setTimeout(() => { lastQuery = q; doSearch(q); }, C.GEOCODE_DEBOUNCE_MS);
 });
@@ -276,7 +349,7 @@ async function doSearch(q) {
 	try {
 		const url= `${C.NOMINATIM_URL}/search?format=json&q=${encodeURIComponent(q)}&limit=${C.GEOCODE_MAX_RESULTS}&addressdetails=1`;
 		const data = await fetch(url, {
-			headers: { 'Accept-Language': 'en', 'User-Agent': 'RangeFinderApp/1.0' }
+			headers: C.NOMINATIM_HEADERS
 		}).then(r => r.json());
 
 		if (locEl.value.trim() !== q) return;
@@ -299,7 +372,7 @@ function renderSug(results) {
 		d.addEventListener('click', () => {
 			locEl.value = r.display_name; lastQuery = r.display_name; hideSug();
 			placePin(+r.lat, +r.lon);
-			map.setView([+r.lat, +r.lon], 10);
+			map.setView([+r.lat, +r.lon], C.MAP_GEOCODE_ZOOM);
 			applyAddress(+r.lat, +r.lon);
 		});
 
@@ -323,9 +396,9 @@ map.on('click', async e => {
 	hideSug();
 
 	try {
-		const url = `${C.NOMINATIM_URL}/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`;
+		const url = `${C.NOMINATIM_URL}/reverse?format=json&lat=${lat}&lon=${lng}&zoom=${C.REVERSE_GEOCODE_ZOOM}&addressdetails=1`;
 		const d = await fetch(url, {
-			headers: { 'Accept-Language': 'en', 'User-Agent': 'RangeFinderApp/1.0' }
+			headers: C.NOMINATIM_HEADERS
 		}).then(r => r.json());
 
 		if (!d?.lat) return;
@@ -494,15 +567,15 @@ function renderResults(workerResult, meta, legOTxt, legITxt) {
 		const icon = L.divIcon({
 			className:'',
 			html: `<div class="ep-marker">${idx + 1}</div>`,
-			iconSize: [18, 18],
+			iconSize: [C.EP_MARKER_SIZE_PX, C.EP_MARKER_SIZE_PX],
 			iconAnchor: [9, 9]
 		});
-		const marker = L.marker([lat, lng], { icon, zIndexOffset: 100 });
+		const marker = L.marker([lat, lng], { icon, zIndexOffset: C.EP_MARKER_Z_OFFSET });
 		if (showPts) marker.addTo(map);
 		epMarkers.push(marker);
 	});
 
-	map.fitBounds(outerLayer.getBounds(), { padding: [40, 40] });
+	map.fitBounds(outerLayer.getBounds(), { padding: [C.MAP_FIT_PADDING_PX, C.MAP_FIT_PADDING_PX] });
 
 	const { effSpd, total, speed, modeTau, terrTau, outerKm, innerKm } = meta;
 	const terrain = document.getElementById('ctx-terrain').value;

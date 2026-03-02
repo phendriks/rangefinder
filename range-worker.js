@@ -131,6 +131,9 @@ function buildGrid(clat, clng, maxKm) {
 	let N = clamp(Math.round(maxKm / C.GRID_SIZE_DIVISOR), C.GRID_SIZE_MIN, C.GRID_SIZE_MAX);
 	N = clamp(N + C.GRID_SIZE_BONUS, C.GRID_SIZE_MIN, C.GRID_SIZE_MAX);
 
+	const density = Math.sqrt(Math.max(1, C.SITES_DENSITY_FACTOR));
+	N = clamp(Math.round(N * density), C.GRID_SIZE_MIN, C.GRID_SIZE_MAX);
+
 	const pts = [];
 	const cellTypes = [];
 	for (let i = 0; i <= N; i++) {
@@ -499,9 +502,6 @@ function isCrossingPoint(lat, lng) {
 			if (!pt) pt = turf.point([lng, lat]);
 			if (turf.booleanPointInPolygon(pt, f.poly)) return true;
 		}
-	}
-	for (const z of C.CROSSING_ZONES) {
-		if (lat >= z[1] && lat <= z[2] && lng >= z[3] && lng <= z[4]) return true;
 	}
 	return false;
 }
