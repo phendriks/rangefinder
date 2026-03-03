@@ -1,11 +1,7 @@
-// constants.js - single source of truth for all tuneable values.
-// Loaded via script tag in the browser and importScripts() in the worker.
-
+// constants.js
 const C = {}; 
 
-C.VECTOR_COUNT					= 90;
-C.VECTOR_STEP_DEG				= 360 / C.VECTOR_COUNT;
-
+// Cell identification
 C.CELL_WATER					= 0;
 C.CELL_LAND						= 1;
 C.CELL_CROSSING					= 2;
@@ -28,7 +24,7 @@ C.DELAUNAY_JITTER_HASH_B		= 43758.5453;
 C.DELAUNAY_JITTER_SALT_STEP		= 1013;
 
 // Ferry/bridge crossings consume more budget to model slower effective speed.
-C.CROSSING_DISTANCE_FACTOR		= 1.25;
+C.CROSSING_DISTANCE_FACTOR		= 1.35;
 
 // Land grid
 C.GRID_MARGIN_FACTOR			= 0.2;	 // padding around outer radius bounding box as a fraction
@@ -50,17 +46,14 @@ C.SITE_FILL_OPACITY_LAND		= 0.55;
 C.SITE_FILL_OPACITY_CROSSING	= 0.55;
 C.SITE_FILL_OPACITY_WATER		= 0.25;
 
-// Phase 5 sampling
-
+// Sampling
 C.LLOYD_ITERATIONS				= 2;
 C.LLOYD_ALPHA					= 0.2;
 C.LLOYD_JITTER_FACTOR			= .75;
 C.LLOYD_HASH_CELL_FACTOR		= 1.6;
-
 C.RASTER_HASH_CELL_FACTOR		= 2.0;
 
-// Phase 5.4 mesh contour extraction
-
+// Mesh contour
 C.CONTOUR_KEY_SCALE				= 1000;
 C.CONTOUR_MAX_STEPS				= 200000;
 C.CONTOUR_MIN_RING_POINTS		= 4;
@@ -88,7 +81,7 @@ C.MODE_TORTUOSITY = {
 	drive						: 1.20,
 };
 
-// Base speeds (APPROXIMATION) calibrated against real drives
+// Base speeds calibrated against 'real' drives
 C.MODE_SPEED_KMH = {
 	drive						: 105,
 	moto						: 100,
@@ -105,18 +98,13 @@ C.MODE_NOTE = {
 	walk	: '5 km/h base, tau_mode 1.05, open land accessible',
 };
 
-// Country polygons are loaded from country-polygons.js in the browser.
+// Country polygons are loaded from country-polygons.js
 C.COUNTRY_POLYGONS					= [];
 
-
-
-// Crossing polygons improve accuracy over bounding boxes.
-// Format: [name, [ring, ring, ...]] where ring is an array of [lng, lat].
-// Crossing polygons are loaded from crossing-polygons.js.
+// Crossing polygons are loaded from crossing-polygons.js
 C.CROSSING_POLYGONS					= [];
 
 // External data and geocoding
-
 C.LAND_DATA_URL						= 'https://cdn.jsdelivr.net/npm/world-atlas@2/land-110m.json';
 C.NOMINATIM_URL						= 'https://nominatim.openstreetmap.org';
 C.NOMINATIM_HEADERS					= { 'Accept-Language': 'en', 'User-Agent': 'RangeFinderApp/1.0' };
@@ -126,13 +114,11 @@ C.GEOCODE_DEBOUNCE_MS				= 1200;
 C.GEOCODE_MIN_QUERY_LENGTH			= 3;
 
 // Debug
-
 C.DEBUG_COUNTRY_REGRESSION			= false;
 C.REVERSE_GEOCODE_MAX_DISTANCE_M	= 25;
 C.REVERSE_GEOCODE_ZOOM				= 18;
 
 // Map and UI layout
-
 C.MAP_INITIAL_CENTER				= [48, 10];
 C.MAP_INITIAL_ZOOM					= 5;
 C.MAP_GEOCODE_ZOOM					= 10;	 // zoom level used when flying to a geocoded result
