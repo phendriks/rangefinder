@@ -10,7 +10,7 @@ From the project root:
 
 Open:
 
-	http://localhost:8000/public/
+	http://localhost:8000/
 
 Notes:
 - This app uses Leaflet and Turf via CDN.
