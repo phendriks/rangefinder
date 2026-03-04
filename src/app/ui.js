@@ -282,7 +282,7 @@ document.getElementById('calc').addEventListener('click', () => {
 	statusArea.classList.add('vis');
 	setStatus('Initialising…', 0);
 
-	worker = new Worker('../src/worker/range-worker.js');
+	worker = new Worker('./src/worker/range-worker.js');
 
 	function finishCalc() {
 		worker = null;
