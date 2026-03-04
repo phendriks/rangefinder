@@ -15,3 +15,15 @@ Open:
 Notes:
 - This app uses Leaflet and Turf via CDN.
 - The worker is loaded from src/worker.
+
+## Optional Natural Earth country polygons
+
+
+To generate a global set from Natural Earth and write it into
+src/data/countries-natural-earth.js:
+
+	python3 scripts/build-country-polygons.py
+
+To use a higher detail dataset:
+
+	python3 scripts/build-country-polygons.py --50m

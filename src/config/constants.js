@@ -98,8 +98,10 @@ C.MODE_NOTE = {
 	walk	: '5 km/h base, tau_mode 1.05, open land accessible',
 };
 
-// Country polygons are loaded from country-polygons.js
+	// Country polygons are loaded from countries-natural-earth.js
 C.COUNTRY_POLYGONS					= [];
+
+	C.COUNTRY_POLYGONS_SOURCE			= 'naturalearth';
 
 // Crossing polygons are loaded from crossing-polygons.js
 C.CROSSING_POLYGONS					= [];
