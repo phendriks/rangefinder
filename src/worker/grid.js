@@ -72,3 +72,4 @@ function buildGridNeighbors(N) {
 		}
 	}
 	return neighbors;
+}
