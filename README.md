@@ -16,7 +16,7 @@ Notes:
 - This app uses Leaflet and Turf via CDN.
 - The worker is loaded from src/worker.
 
-## Optional Natural Earth country polygons
+## Natural Earth country polygons
 
 
 To generate a global set from Natural Earth and write it into
