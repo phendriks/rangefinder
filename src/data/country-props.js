@@ -1,5 +1,7 @@
 'use strict';
 
+// TODO: Divide countries up in parts (start with 4) to introduce more detail to travel distance
+
 // country-props.js - properties for countries listed in C.COUNTRY_DB.
 // Loaded via script tag in the browser.
 
