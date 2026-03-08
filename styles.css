@@ -47,7 +47,7 @@
 		.si .ss { font-size: 11.5px; color: var(--mt); margin-top: 1px; }
 
 		/* Mode buttons */
-		.mr { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+		.mr { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; }
 		.mt { position: relative; }
 		.mt::after {
 			content: attr(data-tip); position: absolute; bottom: calc(100% + 7px); left: 50%;
@@ -164,15 +164,15 @@
 		#sheet-top { display: none; }
 
 
-		/* ════════════════════════════════════════════════════
-			 MOBILE — bottom sheet layout
-			 ════════════════════════════════════════════════════ */
+		/*
+	MOBILE - bottom sheet layout
+	*/
 		@media (max-width: 639px) {
 
 			/* Map fills entire screen */
 			#map { margin: 0 !important; }
 
-			/* Sidebar → fixed bottom sheet */
+			/* Sidebar -> fixed bottom sheet */
 			#sidebar {
 				position: fixed;
 				top: auto; bottom: 0; left: 0; right: 0;

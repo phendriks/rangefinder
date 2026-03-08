@@ -36,9 +36,7 @@ C.GRID_MARGIN_FACTOR			= 0.2;	// padding around outer radius bounding box as a f
 C.GRID_SIZE_DIVISOR				= 10;	// N = clamp(outerKm / divisor, min, max)
 C.GRID_SIZE_MIN					= 40;
 C.GRID_SIZE_MAX					= 90;
-C.GRID_SIZE_BONUS				= 2;
 
-C.SITES_DENSITY_FACTOR			= 3;
 
 C.GRID_DOT_RADIUS					= 2;
 C.GRID_DOT_RADIUS_CROSSING_BONUS	= 1;
@@ -77,11 +75,8 @@ C.TERRAIN_TORTUOSITY = {
 };
 
 // Tortuosity: tau_mode - network constraint per mode.
-// Values from Giacomin & Levinson 2015, Millward et al 2013.
+// Values from Giacomin and Levinson 2015, Millward et al 2013.
 C.MODE_TORTUOSITY = {
-	walk						: 1.05,
-	run							: 1.05,
-	cycle						: 1.08,
 	moto						: 1.15,
 	drive						: 1.20,
 };
@@ -90,17 +85,11 @@ C.MODE_TORTUOSITY = {
 C.MODE_SPEED_KMH = {
 	drive						: 105,
 	moto						: 100,
-	cycle						: 18,
-	run							: 10,
-	walk						: 5,
 };
 
 C.MODE_NOTE = {
-	drive	: '105 km/h base, tau_mode 1.20 (Giacomin & Levinson 2015)',
+	drive	: '105 km/h base, tau_mode 1.20 (Giacomin and Levinson 2015)',
 	moto	: '100 km/h base, tau_mode 1.15, filters traffic and handles mountain passes better',
-	cycle	: '18 km/h base, tau_mode 1.08 (Millward et al. 2013)',
-	run		: '10 km/h base, tau_mode 1.05, open land accessible',
-	walk	: '5 km/h base, tau_mode 1.05, open land accessible',
 };
 
 	// Country polygons are loaded from countries-natural-earth.js

@@ -14,7 +14,7 @@ async function ensureLandLoaded() {
 	if (landFeatures) return;
 	self.postMessage({ type: 'status', msg: 'Loading land data...' });
 
-	const res = await fetch(C.LAND_DATA_URL, { cache: 'force-cache' });
+	const res = await fetch(C.LAND_DATA_URL, { cache: 'no-store' });
 	if (!res.ok) throw new Error(`Failed to load land data (${res.status})`);
 
 	const topo = await res.json();

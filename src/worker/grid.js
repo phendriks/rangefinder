@@ -20,10 +20,7 @@ function buildGrid(clat, clng, maxKm) {
 	// IMPORTANT: constants.js defines GRID_SIZE_DIVISOR as a divisor, not a fixed N.
 	// N grows with range: N = clamp(outerKm / divisor, min, max)
 	let N = clamp(Math.round(maxKm / C.GRID_SIZE_DIVISOR), C.GRID_SIZE_MIN, C.GRID_SIZE_MAX);
-	N = clamp(N + C.GRID_SIZE_BONUS, C.GRID_SIZE_MIN, C.GRID_SIZE_MAX);
 
-	const density = Math.sqrt(Math.max(1, C.SITES_DENSITY_FACTOR));
-	N = clamp(Math.round(N * density), C.GRID_SIZE_MIN, C.GRID_SIZE_MAX);
 
 	const pts = [];
 	const cellTypes = [];

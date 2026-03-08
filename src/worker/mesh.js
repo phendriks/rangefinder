@@ -14,7 +14,6 @@ function buildSitesMesh(clat, clng, maxKm) {
 	const maxLng = clng + lngDelta;
 
 	let N = clamp(Math.round(maxKm / C.GRID_SIZE_DIVISOR), C.GRID_SIZE_MIN, C.GRID_SIZE_MAX);
-	N = clamp(N + C.GRID_SIZE_BONUS, C.GRID_SIZE_MIN, C.GRID_SIZE_MAX);
 
 	const stepLat = (maxLat - minLat) / N;
 	const stepLng = (maxLng - minLng) / N;

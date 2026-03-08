@@ -57,7 +57,7 @@
 		.si .ss { font-size: 11.5px; color: var(--mt); margin-top: 1px; }
 
 		/* Mode buttons */
-		.mr { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+		.mr { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; }
 		.mt { position: relative; }
 		.mt::after {
 			content: attr(data-tip); position: absolute; bottom: calc(100% + 7px); left: 50%;
@@ -174,15 +174,15 @@
 		#sheet-top { display: none; }
 
 
-		/* ════════════════════════════════════════════════════
-			 MOBILE — bottom sheet layout
-			 ════════════════════════════════════════════════════ */
+		/*
+			MOBILE - bottom sheet layout
+			*/
 		@media (max-width: 639px) {
 
 			/* Map fills entire screen */
 			#map { margin: 0 !important; }
 
-			/* Sidebar → fixed bottom sheet */
+			/* Sidebar -> fixed bottom sheet */
 			#sidebar {
 				position: fixed;
 				top: auto; bottom: 0; left: 0; right: 0;
@@ -296,7 +296,7 @@
 		<div class="fl">
 			<label class="lbl">Starting Location</label>
 			<div id="lw">
-				<input type="text" id="loc" placeholder="Type an address or tap the map…" autocomplete="off" spellcheck="false">
+				<input type="text" id="loc" placeholder="Type an address or tap the map..." autocomplete="off" spellcheck="false">
 				<div id="sug"></div>
 			</div>
 		</div>
@@ -306,43 +306,25 @@
 			<label class="lbl">Travel Mode</label>
 			<div class="mr">
 
-				<div class="mt" data-tip="Car · 115 km/h base. Fully road-constrained. τ_mode = 1.20 (Giacomin & Levinson 2015, Env. Planning B).">
+				<div class="mt" data-tip="Car - 105 km/h base. Fully road constrained. tau_mode = 1.20 (Giacomin and Levinson 2015).">
 					<button class="mb active" data-mode="drive">
 						<svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/></svg>
 						Drive
 					</button>
 				</div>
 
-				<div class="mt" data-tip="Motorcycle · 115 km/h base. Road-constrained but filters traffic & handles passes better. τ_mode = 1.15.">
+				<div class="mt" data-tip="Motorcycle - 100 km/h base. Road constrained. tau_mode = 1.15.">
 					<button class="mb" data-mode="moto">
 						<svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M19 7c0-1.1-.9-2-2-2h-3l2 4H5l-1.5 5H2v2h2.05c.24 1.7 1.7 3 3.45 3 1.76 0 3.22-1.3 3.45-3h4.1c.24 1.7 1.7 3 3.45 3 1.76 0 3.22-1.3 3.45-3H24v-2h-.05C23.4 9.3 21.4 7.28 19 7zm-11.5 9c-.83 0-1.5-.67-1.5-1.5S6.67 13 7.5 13s1.5.67 1.5 1.5S8.33 16 7.5 16zm9 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM9 9l-1 5 3.5-3.5L9 9zm8.5-2c.83 0 1.5.67 1.5 1.5S18.33 10 17.5 10 16 9.33 16 8.5 16.67 7 17.5 7z"/></svg>
 						Moto
 					</button>
 				</div>
 
-				<div class="mt" data-tip="Bicycle · 18 km/h base. Uses roads & paths, lower network constraint. τ_mode = 1.08 (Millward et al. 2013).">
-					<button class="mb" data-mode="cycle">
-						<svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM5 12c-2.8 0-5 2.2-5 5s2.2 5 5 5 5-2.2 5-5-2.2-5-5-5zm0 8.5c-1.9 0-3.5-1.6-3.5-3.5S3.1 13.5 5 13.5s3.5 1.6 3.5 3.5-1.6 3.5-3.5 3.5zm5.8-10l2.4-2.4.8.8c1.3 1.3 3 2.1 5.1 2.1V9c-1.5 0-2.7-.6-3.6-1.5l-1.9-1.9c-.5-.4-1-.6-1.6-.6s-1.1.2-1.4.6L7.8 8.4C7.4 8.8 7 9.3 7 10c0 .6.3 1.2.8 1.6l3.2 2.4V18h2v-5l-2.2-2.5zm9.2 1.5c-2.8 0-5 2.2-5 5s2.2 5 5 5 5-2.2 5-5-2.2-5-5-5zm0 8.5c-1.9 0-3.5-1.6-3.5-3.5s1.6-3.5 3.5-3.5 3.5 1.6 3.5 3.5-1.6 3.5-3.5 3.5z"/></svg>
-						Cycle
-					</button>
-				</div>
 
-				<div class="mt" data-tip="Running · 10 km/h base. Can cross open land and parks. Very low network constraint. τ_mode = 1.05.">
-					<button class="mb" data-mode="run">
-						<svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M13.49 5.48c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm-3.6 13.9l1-4.4 2.1 2v6h2v-7.5l-2.1-2 .6-3c1.3 1.5 3.3 2.5 5.5 2.5v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1l-5.2 2.2v4.7h2v-3.4l1.8-.7-1.6 8.1-4.9-1-.4 2 7 1.4z"/></svg>
-						Run
-					</button>
-				</div>
 
-				<div class="mt" data-tip="Walking · 5 km/h base. Minimal tortuosity — walkers can use any path, alley or open field. τ_mode = 1.05.">
-					<button class="mb" data-mode="walk">
-						<svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M13.49 5.48c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm-3.6 13.9l1-4.4 2.1 2v6h2v-7.5l-2.1-2 .6-3c1.3 1.5 3.3 2.5 5.5 2.5v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1l-5.2 2.2v4.7h2v-3.4l1.8-.7-1.6 8.1-4.9-1-.4 2 7 1.4z"/></svg>
-						Walk
-					</button>
-				</div>
 
 			</div>
-			<p class="sn" id="sn">115 km/h base · τ_mode 1.20 (Giacomin &amp; Levinson 2015)</p>
+			<p class="sn" id="sn">105 km/h base - tau_mode 1.20 (Giacomin and Levinson 2015)</p>
 		</div>
 
 	<!-- Options -->
@@ -409,30 +391,30 @@
 			<label class="lbl">Route Context</label>
 			<div class="cr">
 				<span class="cl">Country</span>
-				<span class="cb" id="ctx-country">—</span>
-				<span class="cb" id="ctx-limit" style="color:var(--ac)">—</span>
+				<span class="cb" id="ctx-country">-</span>
+				<span class="cb" id="ctx-limit" style="color:var(--ac)">-</span>
 			</div>
 			<div class="cr">
 				<span class="cl">Terrain</span>
 				<select class="cs" id="ctx-terrain">
 					<option value="flat">Flat (&lt;50 m / 10 km)</option>
-					<option value="rolling" selected>Rolling (50–200 m)</option>
-					<option value="hilly">Hilly (200–500 m)</option>
+					<option value="rolling" selected>Rolling (50-200 m)</option>
+					<option value="hilly">Hilly (200-500 m)</option>
 					<option value="mountain">Mountainous (&gt;500 m)</option>
 				</select>
 			</div>
 			<table class="ft">
-				<tr><td>τ_mode</td><td id="ft-m">—</td></tr>
-				<tr><td>τ_terrain</td><td id="ft-t">—</td></tr>
-				<tr><td>Total tortuosity</td><td id="ft-tot" class="hi">—</td></tr>
-				<tr><td style="padding-top:3px">Effective speed</td><td id="ft-spd" class="hi">—</td></tr>
+				<tr><td>tau_mode</td><td id="ft-m">-</td></tr>
+				<tr><td>tau_terrain</td><td id="ft-t">-</td></tr>
+				<tr><td>Total tortuosity</td><td id="ft-tot" class="hi">-</td></tr>
+				<tr><td style="padding-top:3px">Effective speed</td><td id="ft-spd" class="hi">-</td></tr>
 			</table>
 			<hr class="dv">
 		</div>
 
 		<!-- Progress -->
 		<div id="status-area">
-			<span id="status-msg">Loading…</span>
+			<span id="status-msg">Loading...</span>
 			<div id="progress-bar-wrap"><div id="progress-bar"></div></div>
 		</div>
 
@@ -446,14 +428,14 @@
 			<div class="li"><div class="ls lx"></div><span>Crossing zone (ferry / bridge)</span></div>
 		</div>
 
-		<button id="clr">✕ Clear overlay</button>
+		<button id="clr">X Clear overlay</button>
 
 	</div>
 
 	<div id="ftr">
-		Map &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors ·
-		Geocoding <a href="https://nominatim.org" target="_blank">Nominatim</a> ·
-		Land <a href="https://naturalearthdata.com" target="_blank">Natural Earth</a> ·
+		Map &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors -
+		Geocoding <a href="https://nominatim.org" target="_blank">Nominatim</a> -
+		Land <a href="https://naturalearthdata.com" target="_blank">Natural Earth</a> -
 		Geometry <a href="https://turfjs.org" target="_blank">Turf.js</a>
 	</div>
 </div>
@@ -471,9 +453,6 @@
 	<select id="mini-mode" class="mini-sel" aria-label="Transport type">
 		<option value="drive">Drive</option>
 		<option value="moto">Moto</option>
-		<option value="cycle">Cycle</option>
-		<option value="run">Run</option>
-		<option value="walk">Walk</option>
 	</select>
 
 	<label class="tgr" style="margin:0;">
@@ -487,7 +466,7 @@
 
 	<div class="mini-range" aria-label="Min/max range">
 		<input id="mini-min" class="mini-in" type="number" inputmode="decimal" aria-label="Minimum">
-		<span class="mini-sep">–</span>
+		<span class="mini-sep">-</span>
 		<input id="mini-max" class="mini-in" type="number" inputmode="decimal" aria-label="Maximum">
 		<span id="mini-unit" class="mini-unit">km</span>
 	</div>

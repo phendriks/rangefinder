@@ -68,7 +68,7 @@ function showCtx(country, terrainOverride) {
 		document.getElementById('ctx-country').textContent = country.name;
 		document.getElementById('ctx-limit').textContent = `max ${country.highway} km/h`;
 	} else {
-		document.getElementById('ctx-country').textContent = '—';
+		document.getElementById('ctx-country').textContent = '-';
 		document.getElementById('ctx-limit').textContent = '';
 	}
 
@@ -163,6 +163,7 @@ async function doSearch(q) {
 	try {
 		const url= `${C.NOMINATIM_URL}/search?format=json&q=${encodeURIComponent(q)}&limit=${C.GEOCODE_MAX_RESULTS}&addressdetails=1`;
 		const data = await fetch(url, {
+			cache: 'no-store',
 			headers: C.NOMINATIM_HEADERS
 		}).then(r => r.json());
 
@@ -212,6 +213,7 @@ map.on('click', async e => {
 	try {
 		const url = `${C.NOMINATIM_URL}/reverse?format=json&lat=${lat}&lon=${lng}&zoom=${C.REVERSE_GEOCODE_ZOOM}&addressdetails=1`;
 		const d = await fetch(url, {
+			cache: 'no-store',
 			headers: C.NOMINATIM_HEADERS
 		}).then(r => r.json());
 
@@ -280,7 +282,7 @@ document.getElementById('calc').addEventListener('click', () => {
 
 	calcBtn.disabled = true;
 	statusArea.classList.add('vis');
-	setStatus('Initialising…', 0);
+	setStatus('Initialising...', 0);
 
 	worker = new Worker('./src/worker/range-worker.js');
 
@@ -294,7 +296,7 @@ document.getElementById('calc').addEventListener('click', () => {
 		const msg = evt.data;
 		switch (msg.type) {
 			case 'status': setStatus(msg.msg, null); break;
-			case 'progress': setStatus(`Walking vectors… ${msg.pct}%`, msg.pct); break;
+			case 'progress': setStatus(`Walking vectors... ${msg.pct}%`, msg.pct); break;
 			case 'grid': renderGrid(msg.pts); break;
 			case 'done':
 				finishCalc();
