@@ -1,29 +1,3 @@
-function isDebugEnabled() {
-	const dbg = document.getElementById('dbg');
-	return !!(dbg && dbg.checked);
-}
-
-function applyDebugVisibility() {
-	const show = isDebugEnabled();
-	const ctx = document.getElementById('ctx');
-	const ic = document.getElementById('ic');
-
-	if (ctx) {
-		if (show && ctx.dataset.ready === '1') {
-			ctx.classList.add('vis');
-		} else {
-			ctx.classList.remove('vis');
-		}
-	}
-
-	if (ic) {
-		const hasContent = ic.innerHTML && ic.innerHTML.trim().length;
-		ic.style.display = show && hasContent ? 'block' : 'none';
-	}
-}
-
-;
-
 
 // Mode buttons
 
@@ -33,54 +7,9 @@ document.querySelectorAll('.mb').forEach(btn => {
 		btn.classList.add('active');
 		activeModeKey = btn.dataset.mode;
 		document.getElementById('sn').textContent = C.MODE_NOTE[activeModeKey];
-		updateTable();
 		clearOverlay();
 	});
 });
-
-
-// Context panel
-
-document.getElementById('ctx-terrain').addEventListener('change', () => {updateTable();clearOverlay();});
-
-function updateTable() {
-	const speed= C.MODE_SPEED_KMH[activeModeKey];
-	const modeTau= C.MODE_TORTUOSITY[activeModeKey];
-	const terrTau= C.TERRAIN_TORTUOSITY[document.getElementById('ctx-terrain').value];
-	const total= +(modeTau * terrTau).toFixed(3);
-	const effSpd = +(speed / total).toFixed(1);
-
-	document.getElementById('ft-m').textContent = modeTau.toFixed(2);
-	document.getElementById('ft-t').textContent = terrTau.toFixed(2);
-	document.getElementById('ft-tot').textContent = total.toFixed(2);
-	document.getElementById('ft-spd').textContent = effSpd + ' km/h';
-}
-
-function showCtx(country, terrainOverride) {
-	lastCtxCountry = country || null;
-	lastCtxTerrain = terrainOverride || null;
-
-	const ctxEl = document.getElementById('ctx');
-	if (!ctxEl) return;
-	ctxEl.dataset.ready = '1';
-
-	if (country) {
-		document.getElementById('ctx-country').textContent = country.name;
-		document.getElementById('ctx-limit').textContent = `max ${country.highway} km/h`;
-	} else {
-		document.getElementById('ctx-country').textContent = '-';
-		document.getElementById('ctx-limit').textContent = '';
-	}
-
-	if (terrainOverride) document.getElementById('ctx-terrain').value = terrainOverride;
-	updateTable();
-	applyDebugVisibility();
-}
-
-
-const dbgEl = document.getElementById('dbg');
-if (dbgEl) dbgEl.addEventListener('change', applyDebugVisibility);
-applyDebugVisibility();
 
 
 // Sliders (time)
@@ -230,8 +159,7 @@ map.on('click', async e => {
 });
 
 function applyAddress(lat, lng) {
-	const country = countryAt(lat, lng);
-	showCtx(country, country ? country.terrain : null);
+	placePin(lat, lng);
 }
 
 
@@ -254,7 +182,7 @@ document.getElementById('calc').addEventListener('click', () => {
 
 	const speed = C.MODE_SPEED_KMH[activeModeKey];
 	const modeTau = C.MODE_TORTUOSITY[activeModeKey];
-	const terrTau = C.TERRAIN_TORTUOSITY[document.getElementById('ctx-terrain').value];
+	const terrTau = C.TERRAIN_TAU_DEFAULT;
 	const total = modeTau * terrTau;
 	const effSpd= speed / total;
 

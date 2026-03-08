@@ -9,6 +9,8 @@ importScripts('https://cdn.jsdelivr.net/npm/delaunator@5/delaunator.min.js');
 importScripts('../config/constants.js');
 importScripts('../data/countries-natural-earth.js');
 importScripts('../data/crossing-polygons.js');
+importScripts('../data/roads.js');
+importScripts('roads-classify.js');
 importScripts('land.js');
 importScripts('grid.js');
 importScripts('mesh.js');

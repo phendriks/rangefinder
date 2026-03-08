@@ -82,18 +82,6 @@
 		.mb.active { background: var(--ac); border-color: var(--ac); color: #fff; }
 		.sn { font-size: 11px; color: var(--mt); line-height: 1.5; }
 
-		/* Context panel */
-		#ctx { display: none; flex-direction: column; gap: 7px; }
-		#ctx.vis { display: flex; }
-		.cr    { display: flex; align-items: center; gap: 6px; }
-		.cl    { font-size: 11.5px; color: var(--mt); flex-shrink: 0; min-width: 52px; }
-		.cb    { font-size: 11.5px; font-weight: 600; color: var(--tx); background: var(--bg-d); border: 1px solid var(--bd); border-radius: 2px; padding: 1px 6px; white-space: nowrap; }
-		.cs    { font-size: 11.5px; font-family: inherit; color: var(--tx); background: var(--wh); border: 1px solid var(--bd); border-radius: var(--r); padding: 3px 5px; outline: none; cursor: pointer; flex: 1; min-width: 0; }
-		.cs:focus { border-color: var(--ac); }
-		.ft    { font-size: 11px; color: var(--mt); border-collapse: collapse; width: 100%; }
-		.ft td { padding: 1px 0; }
-		.ft td:last-child { text-align: right; font-weight: 600; color: var(--tx); }
-		.ft .hi { color: var(--ac); font-weight: 700; }
 
 		/* Toggle */
 		.tgr { display: flex; align-items: center; gap: 8px; font-size: 12.5px; user-select: none; cursor: pointer; }
@@ -388,34 +376,8 @@
 
 		<button id="calc">Show Range</button>
 
-		<!-- DEBUG Context panel (shown after geocoding) -->
-		<div id="ctx">
-			<hr class="dv">
-			<label class="lbl">Route Context</label>
-			<div class="cr">
-				<span class="cl">Country</span>
-				<span class="cb" id="ctx-country">-</span>
-				<span class="cb" id="ctx-limit" style="color:var(--ac)">-</span>
-			</div>
-			<div class="cr">
-				<span class="cl">Terrain</span>
-				<select class="cs" id="ctx-terrain">
-					<option value="flat">Flat (&lt;50 m / 10 km)</option>
-					<option value="rolling" selected>Rolling (50-200 m)</option>
-					<option value="hilly">Hilly (200-500 m)</option>
-					<option value="mountain">Mountainous (&gt;500 m)</option>
-				</select>
-			</div>
-			<table class="ft">
-				<tr><td>tau_mode</td><td id="ft-m">-</td></tr>
-				<tr><td>tau_terrain</td><td id="ft-t">-</td></tr>
-				<tr><td>Total tortuosity</td><td id="ft-tot" class="hi">-</td></tr>
-				<tr><td style="padding-top:3px">Effective speed</td><td id="ft-spd" class="hi">-</td></tr>
-			</table>
-			<hr class="dv">
-		</div>
 
-		<!-- Progress -->
+				<!-- Progress -->
 		<div id="status-area">
 			<span id="status-msg">Loading...</span>
 			<div id="progress-bar-wrap"><div id="progress-bar"></div></div>
@@ -482,13 +444,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
 
-<script src="./src/config/constants.js"></script>
-	<script src="./src/data/country-props.js"></script>
-	<script src="./src/data/crossing-props.js"></script>
-	<script src="./src/data/countries-natural-earth.js"></script>
-	<script src="./src/data/crossing-polygons.js"></script>
-	<script src="./src/app/country-lookup.js"></script>
-	<script src="./src/app/app.js"></script>
+<script src="./src/config/constants.js"></script>	<script src="./src/data/crossing-props.js"></script>	<script src="./src/data/crossing-polygons.js"></script>	<script src="./src/app/app.js"></script>
 	<script src="./src/app/render.js"></script>
 	<script src="./src/app/ui.js"></script>
 	<script src="./src/ui/sheet.js"></script>

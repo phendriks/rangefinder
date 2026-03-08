@@ -70,6 +70,12 @@ function showPointInspect(evt, point) {
 	if (!document.getElementById('show-grid').checked) return;
 	if (!pointInspect) return;
 
+	const pointLat = point.lat !== undefined ? point.lat : point[0];
+	const pointLng = point.lng !== undefined ? point.lng : point[1];
+	const tileSizeDeg = C.ROADS_TILE_SIZE_DEG;
+	const tileX = Math.floor((pointLng - C.EUROPE_BBOX_MIN_LNG) / tileSizeDeg);
+	const tileY = Math.floor((pointLat - C.EUROPE_BBOX_MIN_LAT) / tileSizeDeg);
+
 	const landName = point.landType === C.CELL_WATER
 		? 'water'
 		: point.landType === C.CELL_CROSSING
@@ -90,7 +96,7 @@ function showPointInspect(evt, point) {
 
 	const roadValue = point.roadType === null || point.roadType === undefined ? '-' : point.roadType;
 	const speedValue = point.speedClass === null || point.speedClass === undefined ? '-' : point.speedClass;
-	pointInspect.textContent = `landType ${point.landType} ${landName}\nroadType ${roadValue} ${roadName}\nspeedClass ${speedValue} ${speedName}`;
+	pointInspect.textContent = `tile ${tileX} ${tileY}\nlandType ${point.landType} ${landName}\nroadType ${roadValue} ${roadName}\nspeedClass ${speedValue} ${speedName}`;
 	pointInspect.style.display = 'block';
 	movePointInspect(evt);
 }
@@ -182,22 +188,7 @@ function renderResults(workerResult, meta, legOTxt, legITxt) {
 
 	map.fitBounds(outerLayer.getBounds(), { padding: [C.MAP_FIT_PADDING_PX, C.MAP_FIT_PADDING_PX] });
 
-	const { effSpd, total, speed, modeTau, terrTau, outerKm, innerKm } = meta;
-	const terrain = document.getElementById('ctx-terrain').value;
-	const ic = document.getElementById('ic');
-	if (ic) {
-		ic.style.display = 'block';
-		ic.innerHTML = `
-			<div class="icr">~${fmt(outerKm)} km</div> outer crow-flies radius
-			<div class="ics">
-				<b>Speed:</b> ${speed} km/h / ${total.toFixed(2)} = ${effSpd.toFixed(1)} km/h effective<br>
-				<b>tau_mode</b> ${modeTau} x <b>tau_terrain</b> ${C.TERRAIN_TORTUOSITY[terrain].toFixed(2)} = ${total.toFixed(2)}<br>
-				<b>Shape:</b> ${C.VECTOR_COUNT} vectors - ${C.VECTOR_STEP_DEG}deg apart - max redirect ${C.REDIRECT_ANGLE_MAX}deg<br>
-				Inner radius: ~${fmt(innerKm)} km
-			</div>`;
-	}
-
-	applyDebugVisibility();
+	
 
 	document.getElementById('lo-lbl').textContent = legOTxt;
 	document.getElementById('in-lbl').textContent = legITxt;
@@ -216,8 +207,6 @@ function clearOverlay(resetUI = true) {
 	epMarkers.forEach(m => map.removeLayer(m)); epMarkers = [];
 
 	if (resetUI) {
-		const ic = document.getElementById('ic');
-		if (ic) ic.style.display = 'none';
 		document.getElementById('leg').classList.remove('vis');
 		document.getElementById('clr').style.display = 'none';
 		document.getElementById('status-area').classList.remove('vis');

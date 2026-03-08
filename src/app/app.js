@@ -33,7 +33,3 @@ let worker			= null;
 let searchTimer		= null;
 let lastQuery		= '';
 
-// Debug visibility
-
-let lastCtxCountry	= null;
-let lastCtxTerrain	= null;

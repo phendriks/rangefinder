@@ -37,15 +37,7 @@ function buildSitesMesh(clat, clng, maxKm) {
 	const roadTypes = new Array(sites.length).fill(C.ROAD_TYPE_LOCAL);
 	const speedClasses = new Array(sites.length).fill(C.SPEED_CLASS_AVERAGE);
 
-	let delaunayMesh = buildDelaunayMesh(pts, clat, clng, 0, stepKmHint);
-	if (!delaunayMesh) {
-		delaunayMesh = {
-			neighbors: buildGridNeighbors(N),
-			triangles: null,
-			xy: null
-		};
-	}
-	return {
+	const mesh = {
 		pts,
 		cellTypes,
 		landTypes,
@@ -56,13 +48,31 @@ function buildSitesMesh(clat, clng, maxKm) {
 		maxLat,
 		minLng,
 		maxLng,
-		neighbors: delaunayMesh.neighbors,
-		triangles: delaunayMesh.triangles,
-		xy: delaunayMesh.xy,
+		neighbors: null,
+		triangles: null,
+		xy: null,
 		stepKmHint,
 		clat,
 		clng
 	};
+
+	if (typeof AssignRoadEnums === 'function') {
+		AssignRoadEnums(mesh);
+	}
+
+	let delaunayMesh = buildDelaunayMesh(pts, clat, clng, 0, stepKmHint);
+	if (!delaunayMesh) {
+		delaunayMesh = {
+			neighbors: buildGridNeighbors(N),
+			triangles: null,
+			xy: null
+		};
+	}
+
+	mesh.neighbors = delaunayMesh.neighbors;
+	mesh.triangles = delaunayMesh.triangles;
+	mesh.xy = delaunayMesh.xy;
+	return mesh;
 }
 function buildDelaunayMesh(pts, clat, clng, N, stepKmHint) {
 	if (typeof Delaunator === 'undefined') return null;
