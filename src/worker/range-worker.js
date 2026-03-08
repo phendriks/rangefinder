@@ -7,6 +7,7 @@ importScripts('https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js');
 importScripts('https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js');
 importScripts('https://cdn.jsdelivr.net/npm/delaunator@5/delaunator.min.js');
 importScripts('../config/constants.js');
+importScripts('../data/countries-natural-earth.js');
 importScripts('../data/crossing-polygons.js');
 importScripts('land.js');
 importScripts('grid.js');
@@ -30,7 +31,18 @@ self.onmessage = async (e) => {
 	self.postMessage({
 		type: 'grid',
 		pts: mesh.pts
-			.map((p, idx) => ({ lat: p[0], lng: p[1], cell: mesh.cellTypes[idx] }))
+			.map((p, idx) => {
+				const landType = mesh.landTypes[idx];
+				const hasLandEnums = landType !== C.CELL_WATER;
+				return {
+					lat: p[0],
+					lng: p[1],
+					cell: mesh.cellTypes[idx],
+					landType,
+					roadType: hasLandEnums ? mesh.roadTypes[idx] : null,
+					speedClass: hasLandEnums ? mesh.speedClasses[idx] : null
+				};
+			})
 	});
 
 	self.postMessage({ type: 'status', msg: 'Walking land graph...' });

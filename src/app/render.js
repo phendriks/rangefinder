@@ -1,6 +1,121 @@
+const pointInspect = document.getElementById('pi');
+
+let inspectPoints = [];
+let inspectPointPixels = [];
+let inspectRafHandle = null;
+let inspectPendingEvent = null;
+
+function setInspectPoints(points) {
+	inspectPoints = points || [];
+	updateInspectPixels();
+}
+
+function updateInspectPixels() {
+	inspectPointPixels = [];
+	if (!map) return;
+	if (!inspectPoints || inspectPoints.length === 0) return;
+
+	inspectPoints.forEach(point => {
+		const pixel = map.latLngToContainerPoint([point.lat, point.lng]);
+		inspectPointPixels.push({ x: pixel.x, y: pixel.y });
+	});
+}
+
+function scheduleInspect(evt) {
+	if (!document.getElementById('show-grid').checked) return;
+	inspectPendingEvent = evt;
+	if (inspectRafHandle !== null) return;
+	inspectRafHandle = requestAnimationFrame(runInspect);
+}
+
+function runInspect() {
+	inspectRafHandle = null;
+	const evt = inspectPendingEvent;
+	inspectPendingEvent = null;
+	if (!evt) return;
+	if (!document.getElementById('show-grid').checked) return;
+	if (!inspectPoints || inspectPoints.length === 0) return;
+	if (!inspectPointPixels || inspectPointPixels.length !== inspectPoints.length) updateInspectPixels();
+
+	const raw = evt?.originalEvent;
+	if (!raw) return;
+	const mapRect = map.getContainer().getBoundingClientRect();
+	const relX = raw.clientX - mapRect.left;
+	const relY = raw.clientY - mapRect.top;
+
+	let bestIndex = -1;
+	let bestDistSq = Infinity;
+
+	for (let pointIndex = 0; pointIndex < inspectPointPixels.length; pointIndex++) {
+		const pointPixel = inspectPointPixels[pointIndex];
+		const deltaX = pointPixel.x - relX;
+		const deltaY = pointPixel.y - relY;
+		const distSq = (deltaX * deltaX) + (deltaY * deltaY);
+		if (distSq < bestDistSq) {
+			bestDistSq = distSq;
+			bestIndex = pointIndex;
+		}
+	}
+
+	if (bestIndex < 0) return;
+	if (bestDistSq > (C.POINT_INSPECT_RADIUS_PX * C.POINT_INSPECT_RADIUS_PX)) {
+		hidePointInspect();
+		return;
+	}
+
+	showPointInspect(evt, inspectPoints[bestIndex]);
+}
+
+function showPointInspect(evt, point) {
+	if (!document.getElementById('show-grid').checked) return;
+	if (!pointInspect) return;
+
+	const landName = point.landType === C.CELL_WATER
+		? 'water'
+		: point.landType === C.CELL_CROSSING
+			? 'crossing'
+			: 'land';
+	let roadName = '-';
+	if (point.roadType !== null && point.roadType !== undefined) {
+		roadName = point.roadType === C.ROAD_TYPE_MOTORWAY ? 'motorway' : 'local';
+	}
+	let speedName = '-';
+	if (point.speedClass !== null && point.speedClass !== undefined) {
+		speedName = point.speedClass === C.SPEED_CLASS_MAX
+			? 'max'
+			: point.speedClass === C.SPEED_CLASS_LOW
+				? 'low'
+				: 'average';
+	}
+
+	const roadValue = point.roadType === null || point.roadType === undefined ? '-' : point.roadType;
+	const speedValue = point.speedClass === null || point.speedClass === undefined ? '-' : point.speedClass;
+	pointInspect.textContent = `landType ${point.landType} ${landName}\nroadType ${roadValue} ${roadName}\nspeedClass ${speedValue} ${speedName}`;
+	pointInspect.style.display = 'block';
+	movePointInspect(evt);
+}
+
+function movePointInspect(evt) {
+	if (!pointInspect || pointInspect.style.display !== 'block') return;
+	const raw = evt?.originalEvent;
+	if (!raw) return;
+	pointInspect.style.left = (raw.clientX + 14) + 'px';
+	pointInspect.style.top = (raw.clientY + 14) + 'px';
+}
+
+function hidePointInspect() {
+	if (!pointInspect) return;
+	pointInspect.style.display = 'none';
+}
+
+map.on('mousemove', (evt) => scheduleInspect(evt));
+map.on('moveend', () => updateInspectPixels());
+map.on('zoomend', () => updateInspectPixels());
+
 function renderGrid(pts) {
 	gridMarkers.forEach(m => map.removeLayer(m));
 	gridMarkers = [];
+	setInspectPoints(pts);
 
 	const showGrid = document.getElementById('show-grid').checked;
 
@@ -28,6 +143,7 @@ function renderGrid(pts) {
 			weight: 0
 		});
 		if (showGrid) m.addTo(map);
+		m.on('mousemove', (evt) => movePointInspect(evt));
 		gridMarkers.push(m);
 	});
 }
@@ -69,15 +185,17 @@ function renderResults(workerResult, meta, legOTxt, legITxt) {
 	const { effSpd, total, speed, modeTau, terrTau, outerKm, innerKm } = meta;
 	const terrain = document.getElementById('ctx-terrain').value;
 	const ic = document.getElementById('ic');
-	ic.style.display = 'block';
-	ic.innerHTML = `
-		<div class="icr">~${fmt(outerKm)} km</div> outer crow-flies radius
-		<div class="ics">
-			<b>Speed:</b> ${speed} km/h / ${total.toFixed(2)} = ${effSpd.toFixed(1)} km/h effective<br>
-			<b>tau_mode</b> ${modeTau} x <b>tau_terrain</b> ${C.TERRAIN_TORTUOSITY[terrain].toFixed(2)} = ${total.toFixed(2)}<br>
-			<b>Shape:</b> ${C.VECTOR_COUNT} vectors - ${C.VECTOR_STEP_DEG}deg apart - max redirect ${C.REDIRECT_ANGLE_MAX}deg<br>
-			Inner radius: ~${fmt(innerKm)} km
-		</div>`;
+	if (ic) {
+		ic.style.display = 'block';
+		ic.innerHTML = `
+			<div class="icr">~${fmt(outerKm)} km</div> outer crow-flies radius
+			<div class="ics">
+				<b>Speed:</b> ${speed} km/h / ${total.toFixed(2)} = ${effSpd.toFixed(1)} km/h effective<br>
+				<b>tau_mode</b> ${modeTau} x <b>tau_terrain</b> ${C.TERRAIN_TORTUOSITY[terrain].toFixed(2)} = ${total.toFixed(2)}<br>
+				<b>Shape:</b> ${C.VECTOR_COUNT} vectors - ${C.VECTOR_STEP_DEG}deg apart - max redirect ${C.REDIRECT_ANGLE_MAX}deg<br>
+				Inner radius: ~${fmt(innerKm)} km
+			</div>`;
+	}
 
 	applyDebugVisibility();
 
@@ -98,7 +216,8 @@ function clearOverlay(resetUI = true) {
 	epMarkers.forEach(m => map.removeLayer(m)); epMarkers = [];
 
 	if (resetUI) {
-		document.getElementById('ic').style.display = 'none';
+		const ic = document.getElementById('ic');
+		if (ic) ic.style.display = 'none';
 		document.getElementById('leg').classList.remove('vis');
 		document.getElementById('clr').style.display = 'none';
 		document.getElementById('status-area').classList.remove('vis');

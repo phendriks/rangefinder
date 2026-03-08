@@ -86,7 +86,16 @@ function getCountryBboxArea(name) {
 }
 
 
+
+function IsInEuropeBounds(lat, lng) {
+	if (!C) return true;
+	if (lng < C.EUROPE_BBOX_MIN_LNG || lng > C.EUROPE_BBOX_MAX_LNG) return false;
+	if (lat < C.EUROPE_BBOX_MIN_LAT || lat > C.EUROPE_BBOX_MAX_LAT) return false;
+	return true;
+}
+
 function countryAt(lat, lng) {
+	if (!IsInEuropeBounds(lat, lng)) return null;
 	ensureCountriesLoaded();
 	const hits = [];
 	const names = countryNameList || [];

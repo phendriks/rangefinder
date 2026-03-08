@@ -6,6 +6,14 @@ C.CELL_WATER					= 0;
 C.CELL_LAND						= 1;
 C.CELL_CROSSING					= 2;
 
+// Point attributes
+C.ROAD_TYPE_MOTORWAY			= 0;
+C.ROAD_TYPE_LOCAL				= 1;
+
+C.SPEED_CLASS_MAX				= 0;
+C.SPEED_CLASS_AVERAGE			= 1;
+C.SPEED_CLASS_LOW				= 2;
+
 // Geodesy
 C.EARTH_RADIUS_KM				= 6371;
 C.KM_PER_DEG_LAT				= 111;
@@ -36,10 +44,13 @@ C.GRID_MARGIN_FACTOR			= 0.2;	// padding around outer radius bounding box as a f
 C.GRID_SIZE_DIVISOR				= 10;	// N = clamp(outerKm / divisor, min, max)
 C.GRID_SIZE_MIN					= 40;
 C.GRID_SIZE_MAX					= 90;
+C.GRID_SIZE_BONUS				= 2;
 
+C.SITES_DENSITY_FACTOR			= 3;
 
 C.GRID_DOT_RADIUS					= 2;
 C.GRID_DOT_RADIUS_CROSSING_BONUS	= 1;
+C.POINT_INSPECT_RADIUS_PX			= 18;
 
 C.SITE_COLOUR_LAND				= '#28a050';
 C.SITE_COLOUR_CROSSING			= '#e08020';
@@ -75,8 +86,11 @@ C.TERRAIN_TORTUOSITY = {
 };
 
 // Tortuosity: tau_mode - network constraint per mode.
-// Values from Giacomin and Levinson 2015, Millward et al 2013.
+// Values from Giacomin & Levinson 2015, Millward et al 2013.
 C.MODE_TORTUOSITY = {
+	walk						: 1.05,
+	run							: 1.05,
+	cycle						: 1.08,
 	moto						: 1.15,
 	drive						: 1.20,
 };
@@ -85,11 +99,17 @@ C.MODE_TORTUOSITY = {
 C.MODE_SPEED_KMH = {
 	drive						: 105,
 	moto						: 100,
+	cycle						: 18,
+	run							: 10,
+	walk						: 5,
 };
 
 C.MODE_NOTE = {
-	drive	: '105 km/h base, tau_mode 1.20 (Giacomin and Levinson 2015)',
+	drive	: '105 km/h base, tau_mode 1.20 (Giacomin & Levinson 2015)',
 	moto	: '100 km/h base, tau_mode 1.15, filters traffic and handles mountain passes better',
+	cycle	: '18 km/h base, tau_mode 1.08 (Millward et al. 2013)',
+	run		: '10 km/h base, tau_mode 1.05, open land accessible',
+	walk	: '5 km/h base, tau_mode 1.05, open land accessible',
 };
 
 	// Country polygons are loaded from countries-natural-earth.js
@@ -101,7 +121,7 @@ C.COUNTRY_POLYGONS					= [];
 C.CROSSING_POLYGONS					= [];
 
 // External data and geocoding
-C.LAND_DATA_URL						= 'https://cdn.jsdelivr.net/npm/world-atlas@2/land-110m.json';
+C.LAND_DATA_URL						= '';
 C.NOMINATIM_URL						= 'https://nominatim.openstreetmap.org';
 C.NOMINATIM_HEADERS					= { 'Accept-Language': 'en', 'User-Agent': 'RangeFinderApp/1.0' };
 
@@ -113,6 +133,13 @@ C.GEOCODE_MIN_QUERY_LENGTH			= 3;
 C.DEBUG_COUNTRY_REGRESSION			= false;
 C.REVERSE_GEOCODE_MAX_DISTANCE_M	= 25;
 C.REVERSE_GEOCODE_ZOOM				= 18;
+
+
+// Europe bounds
+C.EUROPE_BBOX_MIN_LNG				= -25;
+C.EUROPE_BBOX_MIN_LAT				= 34;
+C.EUROPE_BBOX_MAX_LNG				= 45;
+C.EUROPE_BBOX_MAX_LAT				= 72;
 
 // Map and UI layout
 C.MAP_INITIAL_CENTER				= [48, 10];

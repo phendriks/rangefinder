@@ -330,13 +330,16 @@
 	<!-- Options -->
 		<div class="opts-row">
 			<input type="checkbox" id="show-grid" unchecked>
-			<label for="show-grid">Show point grid</label>
+			<label for="show-grid">Inspect grid</label>
 			&nbsp;
 			<input type="checkbox" id="show-pts" unchecked>
 			<label for="show-pts">Show route ends</label>
 			&nbsp;
-			<input type="checkbox" id="dbg" unchecked>
-			<label for="dbg">Debug</label>
+				<!-- Inspect is combined with Inspect grid -->
+				<!--
+				<input type="checkbox" id="dbg" unchecked>
+				<label for="dbg">Debug</label>
+				-->
 		</div>
 
 		<!-- Toggle -->
@@ -418,7 +421,7 @@
 			<div id="progress-bar-wrap"><div id="progress-bar"></div></div>
 		</div>
 
-		<div id="ic"></div>
+		<!-- <div id="ic"></div> -->
 
 		<div id="leg">
 			<hr class="dv">
@@ -473,6 +476,8 @@
 
 	<button id="mini-calc" class="mini-btn primary" type="button">Show</button>
 </div>
+
+<div id="pi" class="pi" style="display:none"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>

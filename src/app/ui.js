@@ -134,6 +134,7 @@ document.getElementById('dp').style.display = 'none';
 
 document.getElementById('show-grid').addEventListener('change', function () {
 	gridMarkers.forEach(m => this.checked ? map.addLayer(m) : map.removeLayer(m));
+	if (!this.checked) hidePointInspect();
 });
 
 document.getElementById('show-pts').addEventListener('change', function () {

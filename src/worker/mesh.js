@@ -33,6 +33,9 @@ function buildSitesMesh(clat, clng, maxKm) {
 		pts[i] = [sites[i].lat, sites[i].lng];
 		cellTypes[i] = classifyCell(sites[i].lat, sites[i].lng);
 	}
+	const landTypes = cellTypes;
+	const roadTypes = new Array(sites.length).fill(C.ROAD_TYPE_LOCAL);
+	const speedClasses = new Array(sites.length).fill(C.SPEED_CLASS_AVERAGE);
 
 	let delaunayMesh = buildDelaunayMesh(pts, clat, clng, 0, stepKmHint);
 	if (!delaunayMesh) {
@@ -45,6 +48,9 @@ function buildSitesMesh(clat, clng, maxKm) {
 	return {
 		pts,
 		cellTypes,
+		landTypes,
+		roadTypes,
+		speedClasses,
 		N,
 		minLat,
 		maxLat,
