@@ -3,6 +3,13 @@
 
 let landFeatures = null; // FeatureCollection of land polygons
 let crossingFeatures = null; // Array of crossing polygons
+
+function bufferFeatureIfNeeded(feature) {
+	const bufferKm = Number(C.POLYGON_BUFFER_KM) || 0;
+	if (!feature || !(bufferKm > 0)) return feature;
+	const buffered = turf.buffer(feature, bufferKm, { units: 'kilometers' });
+	return buffered || feature;
+}
 async function ensureLandLoaded() {
 	if (landFeatures) return;
 	self.postMessage({ type: 'status', msg: 'Loading land data...' });
@@ -15,6 +22,7 @@ async function ensureLandLoaded() {
 	if (!landObj) throw new Error('Land topojson missing objects.land');
 
 	landFeatures = topojson.feature(topo, landObj);
+	landFeatures = bufferFeatureIfNeeded(landFeatures);
 	ensureCrossingsLoaded();
 }
 
@@ -41,10 +49,12 @@ function ensureCrossingsLoaded() {
 				if (lat > maxLat) maxLat = lat;
 			}
 			const bbox = [minLat, maxLat, minLng, maxLng];
+			const poly = bufferFeatureIfNeeded(turf.polygon([ring], { name }));
+			const bufferedBbox = turf.bbox(poly);
 			crossingFeatures.push({
 				name,
-				bbox,
-				poly: turf.polygon([ring], { name })
+				bbox: [bufferedBbox[1], bufferedBbox[3], bufferedBbox[0], bufferedBbox[2]],
+				poly
 			});
 		}
 	}

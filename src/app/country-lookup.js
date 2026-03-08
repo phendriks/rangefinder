@@ -15,6 +15,13 @@ let countryBoundsIndex			= null;
 let countryNameList				= null;
 let countryPropsCache			= null;
 
+function bufferCountryPolygonIfNeeded(poly) {
+	const bufferKm = Number(C.POLYGON_BUFFER_KM) || 0;
+	if (!(bufferKm > 0)) return poly;
+	const buffered = turf.buffer(poly, bufferKm, { units: 'kilometers' });
+	return buffered || poly;
+}
+
 function ensureCountriesLoaded() {
 	if (countryPolyIndex) return;
 	countryPolyIndex = {};
@@ -34,13 +41,15 @@ function ensureCountriesLoaded() {
 				if (lng > maxLng) maxLng = lng;
 				if (lat > maxLat) maxLat = lat;
 			}
-			if (minLng < cMinLng) cMinLng = minLng;
-			if (minLat < cMinLat) cMinLat = minLat;
-			if (maxLng > cMaxLng) cMaxLng = maxLng;
-			if (maxLat > cMaxLat) cMaxLat = maxLat;
+			const poly = bufferCountryPolygonIfNeeded(turf.polygon([ring]));
+			const bufferedBbox = turf.bbox(poly);
+			if (bufferedBbox[0] < cMinLng) cMinLng = bufferedBbox[0];
+			if (bufferedBbox[1] < cMinLat) cMinLat = bufferedBbox[1];
+			if (bufferedBbox[2] > cMaxLng) cMaxLng = bufferedBbox[2];
+			if (bufferedBbox[3] > cMaxLat) cMaxLat = bufferedBbox[3];
 			polys.push({
-				poly:					turf.polygon([ring]),
-				bbox:					[minLng, minLat, maxLng, maxLat],
+				poly,
+				bbox:					[bufferedBbox[0], bufferedBbox[1], bufferedBbox[2], bufferedBbox[3]],
 			});
 		}
 		countryPolyIndex[entry.name] = polys;

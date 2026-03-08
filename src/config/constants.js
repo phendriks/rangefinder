@@ -26,9 +26,14 @@ C.DELAUNAY_JITTER_SALT_STEP		= 1013;
 // Ferry/bridge crossings consume more budget to model slower effective speed.
 C.CROSSING_DISTANCE_FACTOR		= 1.35;
 
+// Polygon buffering
+// Small absolute buffer in kilometres to reduce false coastal misses.
+C.POLYGON_BUFFER_KM				= 15;
+
 // Land grid
-C.GRID_MARGIN_FACTOR			= 0.2;	 // padding around outer radius bounding box as a fraction
-C.GRID_SIZE_DIVISOR				= 10;		// N = clamp(outerKm / divisor, min, max)
+
+C.GRID_MARGIN_FACTOR			= 0.2;	// padding around outer radius bounding box as a fraction
+C.GRID_SIZE_DIVISOR				= 10;	// N = clamp(outerKm / divisor, min, max)
 C.GRID_SIZE_MIN					= 40;
 C.GRID_SIZE_MAX					= 90;
 C.GRID_SIZE_BONUS				= 2;
