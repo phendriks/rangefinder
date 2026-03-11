@@ -38,6 +38,7 @@ function buildSitesMesh(clat, clng, maxKm) {
 	const speedClasses = new Array(sites.length).fill(C.SPEED_CLASS_AVERAGE);
 	const densityFactors = new Array(sites.length).fill(null);
 	const fastRatios = new Array(sites.length).fill(null);
+	const roadBands = new Array(sites.length).fill(null);
 
 	const mesh = {
 		pts,
@@ -47,6 +48,7 @@ function buildSitesMesh(clat, clng, maxKm) {
 		speedClasses,
 		densityFactors,
 		fastRatios,
+		roadBands,
 		N,
 		minLat,
 		maxLat,

@@ -14,6 +14,11 @@ C.SPEED_CLASS_MAX				= 0;
 C.SPEED_CLASS_AVERAGE			= 1;
 C.SPEED_CLASS_LOW				= 2;
 
+// Speed class scoring
+C.SPEED_CLASS_WEIGHTS				= [1, 0.8, 0.3, 0.15];
+C.SPEED_CLASS_DETERMINANTS		= [150, 125, 100, 75];
+C.SPEED_CLASS_GRID_SIZE			= 1.0;
+
 // Roads classification
 C.ROAD_PROXIMITY_RADIUS_KM		= 8;
 

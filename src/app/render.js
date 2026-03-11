@@ -91,9 +91,10 @@ function showPointInspect(evt, point) {
 	}
 
 	const speedValue = point.speedClass === null || point.speedClass === undefined ? '-' : point.speedClass;
-	const densityFactorValue = Number.isFinite(point.densityFactor) ? point.densityFactor.toFixed(3) : '-';
-	const fastRatioValue = Number.isFinite(point.fastRatio) ? point.fastRatio.toFixed(3) : '-';
-	pointInspect.textContent = `tile ${tileX} ${tileY}\nlandType ${point.landType} ${landName}\nspeedClass ${speedValue} ${speedName}\ndensityFactor ${densityFactorValue}\nfastRatio ${fastRatioValue}`;
+	const roadBandsValue = Array.isArray(point.roadBands) && point.roadBands.length >= 4
+		? point.roadBands.slice(0, 4).map(v => Number.isFinite(v) ? v.toFixed(1) : '-').join(',')
+		: '-';
+	pointInspect.textContent = `tile ${tileX} ${tileY}\nlandType ${point.landType} ${landName}\nspeedClass ${speedValue} ${speedName}\nroadBands ${roadBandsValue}`;
 	pointInspect.style.display = 'block';
 	movePointInspect(evt);
 }

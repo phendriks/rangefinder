@@ -42,8 +42,7 @@ self.onmessage = async (e) => {
 					cell: mesh.cellTypes[idx],
 					landType,
 					speedClass: hasLandEnums ? mesh.speedClasses[idx] : null,
-					densityFactor: hasLandEnums ? mesh.densityFactors[idx] : null,
-					fastRatio: hasLandEnums ? mesh.fastRatios[idx] : null
+					roadBands: hasLandEnums ? mesh.roadBands?.[idx] : null
 				};
 			})
 	});
