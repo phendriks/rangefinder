@@ -122,7 +122,6 @@ C.DEBUG_COUNTRY_REGRESSION			= false;
 C.REVERSE_GEOCODE_MAX_DISTANCE_M	= 25;
 C.REVERSE_GEOCODE_ZOOM				= 18;
 
-
 // Europe bounds
 C.EUROPE_BBOX_MIN_LNG				= -25;
 C.EUROPE_BBOX_MIN_LAT				= 34;
@@ -130,7 +129,16 @@ C.EUROPE_BBOX_MAX_LNG				= 45;
 C.EUROPE_BBOX_MAX_LAT				= 72;
 
 // Roads tiles
-C.ROADS_TILE_SIZE_DEG				= 2;
+C.ROADS_TILE_SIZE_DEG				= 1;
+
+// Road speed weights (relative travel capability per km)
+C.ROAD_SPEED_WEIGHT_FAST			= 1;	// motorway and trunks
+C.ROAD_SPEED_WEIGHT_MAIN			= 0.7;	// primary and secondary
+C.ROAD_SPEED_WEIGHT_MID				= 0.4;	// tertiary
+C.ROAD_SPEED_WEIGHT_LOCAL			= 0.2;	// residential
+
+// Road density saturation midpoint (capability units)
+C.ROAD_CAP_HALF						= 300;
 
 // Map and UI layout
 C.MAP_INITIAL_CENTER				= [48, 10];

@@ -81,10 +81,6 @@ function showPointInspect(evt, point) {
 		: point.landType === C.CELL_CROSSING
 			? 'crossing'
 			: 'land';
-	let roadName = '-';
-	if (point.roadType !== null && point.roadType !== undefined) {
-		roadName = point.roadType === C.ROAD_TYPE_MOTORWAY ? 'motorway' : 'local';
-	}
 	let speedName = '-';
 	if (point.speedClass !== null && point.speedClass !== undefined) {
 		speedName = point.speedClass === C.SPEED_CLASS_MAX
@@ -94,9 +90,10 @@ function showPointInspect(evt, point) {
 				: 'average';
 	}
 
-	const roadValue = point.roadType === null || point.roadType === undefined ? '-' : point.roadType;
 	const speedValue = point.speedClass === null || point.speedClass === undefined ? '-' : point.speedClass;
-	pointInspect.textContent = `tile ${tileX} ${tileY}\nlandType ${point.landType} ${landName}\nroadType ${roadValue} ${roadName}\nspeedClass ${speedValue} ${speedName}`;
+	const densityFactorValue = Number.isFinite(point.densityFactor) ? point.densityFactor.toFixed(3) : '-';
+	const fastRatioValue = Number.isFinite(point.fastRatio) ? point.fastRatio.toFixed(3) : '-';
+	pointInspect.textContent = `tile ${tileX} ${tileY}\nlandType ${point.landType} ${landName}\nspeedClass ${speedValue} ${speedName}\ndensityFactor ${densityFactorValue}\nfastRatio ${fastRatioValue}`;
 	pointInspect.style.display = 'block';
 	movePointInspect(evt);
 }

@@ -36,6 +36,8 @@ function buildSitesMesh(clat, clng, maxKm) {
 	const landTypes = cellTypes;
 	const roadTypes = new Array(sites.length).fill(C.ROAD_TYPE_LOCAL);
 	const speedClasses = new Array(sites.length).fill(C.SPEED_CLASS_AVERAGE);
+	const densityFactors = new Array(sites.length).fill(null);
+	const fastRatios = new Array(sites.length).fill(null);
 
 	const mesh = {
 		pts,
@@ -43,6 +45,8 @@ function buildSitesMesh(clat, clng, maxKm) {
 		landTypes,
 		roadTypes,
 		speedClasses,
+		densityFactors,
+		fastRatios,
 		N,
 		minLat,
 		maxLat,

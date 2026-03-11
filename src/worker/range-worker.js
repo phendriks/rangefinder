@@ -10,7 +10,7 @@ importScripts('../config/constants.js');
 importScripts('../data/countries-natural-earth.js');
 importScripts('../data/crossing-polygons.js');
 importScripts('../data/roads.js');
-importScripts('roads-classify.js');
+importScripts('roads-tileclassify.js');
 importScripts('land.js');
 importScripts('grid.js');
 importScripts('mesh.js');
@@ -41,8 +41,9 @@ self.onmessage = async (e) => {
 					lng: p[1],
 					cell: mesh.cellTypes[idx],
 					landType,
-					roadType: hasLandEnums ? mesh.roadTypes[idx] : null,
-					speedClass: hasLandEnums ? mesh.speedClasses[idx] : null
+					speedClass: hasLandEnums ? mesh.speedClasses[idx] : null,
+					densityFactor: hasLandEnums ? mesh.densityFactors[idx] : null,
+					fastRatio: hasLandEnums ? mesh.fastRatios[idx] : null
 				};
 			})
 	});
