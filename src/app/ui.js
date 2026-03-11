@@ -17,8 +17,8 @@ document.querySelectorAll('.mb').forEach(btn => {
 const mih = document.getElementById('mih'), mah = document.getElementById('mah');
 const mis = document.getElementById('mis'), mas = document.getElementById('mas');
 
-function sMin(v) { v = Math.max(0.5, Math.min(+mah.value - 0.5, +v)); mih.value = mis.value = v; }
-function sMax(v) { v = Math.min(24,Math.max(+mih.value + 0.5, +v)); mah.value = mas.value = v; }
+function sMin(v) { v = Math.max(C.UI_TIME_MIN_HOURS, Math.min(+mah.value - C.UI_TIME_STEP_HOURS, +v)); mih.value = mis.value = v; }
+function sMax(v) { v = Math.min(C.UI_TIME_MAX_HOURS, Math.max(+mih.value + C.UI_TIME_STEP_HOURS, +v)); mah.value = mas.value = v; }
 
 mih.addEventListener('change', e => sMin(e.target.value));
 mis.addEventListener('input',e => sMin(e.target.value));
@@ -31,8 +31,8 @@ mas.addEventListener('input',e => sMax(e.target.value));
 const mid= document.getElementById('mid'),mad= document.getElementById('mad');
 const mids = document.getElementById('mids'), mads = document.getElementById('mads');
 
-function sdMin(v) { v = Math.max(10, Math.min(+mad.value - 10, +v)); mid.value = mids.value = v; }
-function sdMax(v) { v = Math.min(5000, Math.max(+mid.value + 10, +v)); mad.value = mads.value = v; }
+function sdMin(v) { v = Math.max(C.UI_DIST_MIN_KM, Math.min(+mad.value - C.UI_DIST_STEP_KM, +v)); mid.value = mids.value = v; }
+function sdMax(v) { v = Math.min(C.UI_DIST_MAX_KM, Math.max(+mid.value + C.UI_DIST_STEP_KM, +v)); mad.value = mads.value = v; }
 
 mid.addEventListener('change',e => sdMin(e.target.value));
 mids.addEventListener('input',e => sdMin(e.target.value));
@@ -213,7 +213,7 @@ document.getElementById('calc').addEventListener('click', () => {
 	statusArea.classList.add('vis');
 	setStatus('Initialising...', 0);
 
-	worker = new Worker('./src/worker/range-worker.js');
+	worker = new Worker('./src/worker/rangeWorker.js');
 
 	function finishCalc() {
 		worker = null;

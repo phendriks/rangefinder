@@ -1,4 +1,4 @@
-// range-worker.js
+// rangeWorker.js
 // Computes reachable land ranges on a coarse land grid using Dijkstra.
 // Talks to app.js via messages of the form:
 //     { type:'status'|'grid'|'done'|'error', ... }
@@ -7,14 +7,19 @@ importScripts('https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js');
 importScripts('https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js');
 importScripts('https://cdn.jsdelivr.net/npm/delaunator@5/delaunator.min.js');
 importScripts('../config/constants.js');
-importScripts('../data/countries-natural-earth.js');
-importScripts('../data/crossing-polygons.js');
+importScripts('../shared/math.js');
+importScripts('../shared/geo.js');
+importScripts('../shared/minHeap.js');
+importScripts('../shared/spatialHash.js');
+importScripts('../domain/roads/speedClass.js');
+importScripts('../data/countriesNaturalEarth.js');
+importScripts('../data/crossingPolygons.js');
 importScripts('../data/roads.js');
-importScripts('roads-tileclassify.js');
-importScripts('land.js');
-importScripts('grid.js');
-importScripts('mesh.js');
-importScripts('contour.js');
+importScripts('roads/tileClassification.js');
+importScripts('land/land.js');
+importScripts('grid/grid.js');
+importScripts('mesh/meshBuild.js');
+importScripts('contour/contour.js');
 
 
 self.onmessage = async (e) => {
@@ -78,42 +83,6 @@ self.onmessage = async (e) => {
 	}
 };
 
-class MinHeap {
-	constructor() { this.items = []; }
-	push(node) { this.items.push(node); this.bubbleUp(this.items.length - 1); }
-	pop() {
-	if (!this.items.length) return null;
-	const top = this.items[0];
-	const last = this.items.pop();
-	if (this.items.length) {
-		this.items[0] = last;
-		this.sinkDown(0);
-	}
-	return top;
-	}
-	bubbleUp(i) {
-	while (i > 0) {
-		const p = (i - 1) >> 1;
-		if (this.items[p].cost <= this.items[i].cost) break;
-		[this.items[p], this.items[i]] = [this.items[i], this.items[p]];
-		i = p;
-	}
-	}
-	sinkDown(i) {
-	const n = this.items.length;
-	while (true) {
-		const l = i * 2 + 1;
-		const r = i * 2 + 2;
-		let m = i;
-		if (l < n && this.items[l].cost < this.items[m].cost) m = l;
-		if (r < n && this.items[r].cost < this.items[m].cost) m = r;
-		if (m === i) break;
-		[this.items[m], this.items[i]] = [this.items[i], this.items[m]];
-		i = m;
-	}
-	}
-}
-
 function computeDistanceField(mesh, maxKm, clat, clng) {
 	const { pts, cellTypes, neighbors } = mesh;
 	const costs = new Array(pts.length).fill(Infinity);
@@ -158,38 +127,3 @@ function computeDistanceField(mesh, maxKm, clat, clng) {
 	return costs;
 }
 
-function findClosestIndex(pts, lat, lng) {
-	let bestIdx = 0;
-	let bestDist = Infinity;
-	for (let i = 0; i < pts.length; i++) {
-	const d = haversineKm(pts[i], [lat, lng]);
-	if (d < bestDist) { bestDist = d; bestIdx = i; }
-	}
-	return bestIdx;
-}
-
-function findClosestNonWaterIndex(pts, cellTypes, lat, lng) {
-	let bestIdx = -1;
-	let bestDist = Infinity;
-	for (let i = 0; i < pts.length; i++) {
-	if (cellTypes[i] === C.CELL_WATER) continue;
-	const d = haversineKm(pts[i], [lat, lng]);
-	if (d < bestDist) { bestDist = d; bestIdx = i; }
-	}
-	return bestIdx;
-}
-
-function haversineKm(a, b) {
-	const R = C.EARTH_RADIUS_KM;
-	const dLat = (b[0] - a[0]) * Math.PI / 180;
-	const dLng = (b[1] - a[1]) * Math.PI / 180;
-
-	const lat1 = a[0] * Math.PI / 180;
-	const lat2 = b[0] * Math.PI / 180;
-
-	const sin1 = Math.sin(dLat / 2);
-	const sin2 = Math.sin(dLng / 2);
-
-	const h = sin1 * sin1 + Math.cos(lat1) * Math.cos(lat2) * sin2 * sin2;
-	return 2 * R * Math.asin(Math.sqrt(h));
-}

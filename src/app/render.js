@@ -103,8 +103,8 @@ function movePointInspect(evt) {
 	if (!pointInspect || pointInspect.style.display !== 'block') return;
 	const raw = evt?.originalEvent;
 	if (!raw) return;
-	pointInspect.style.left = (raw.clientX + 14) + 'px';
-	pointInspect.style.top = (raw.clientY + 14) + 'px';
+	pointInspect.style.left = (raw.clientX + C.UI_POINT_INSPECT_OFFSET_PX) + 'px';
+	pointInspect.style.top = (raw.clientY + C.UI_POINT_INSPECT_OFFSET_PX) + 'px';
 }
 
 function hidePointInspect() {
@@ -177,7 +177,7 @@ function renderResults(workerResult, meta, legOTxt, legITxt) {
 			className:'',
 			html: `<div class="ep-marker">${idx + 1}</div>`,
 			iconSize: [C.EP_MARKER_SIZE_PX, C.EP_MARKER_SIZE_PX],
-			iconAnchor: [9, 9]
+			iconAnchor: [C.EP_MARKER_ANCHOR_PX, C.EP_MARKER_ANCHOR_PX]
 		});
 		const marker = L.marker([lat, lng], { icon, zIndexOffset: C.EP_MARKER_Z_OFFSET });
 		if (showPts) marker.addTo(map);

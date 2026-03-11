@@ -1,9 +1,6 @@
 // grid.js
 // Grid and neighbor helpers for range-worker.
 
-function clamp(n, lo, hi) {
-	return Math.max(lo, Math.min(hi, n));
-}
 function buildGrid(clat, clng, maxKm) {
 	// Expand bbox slightly so contours have room.
 	const marginKm = maxKm * C.GRID_MARGIN_FACTOR;
@@ -18,8 +15,8 @@ function buildGrid(clat, clng, maxKm) {
 	const maxLng = clng + lngDelta;
 
 	// IMPORTANT: constants.js defines GRID_SIZE_DIVISOR as a divisor, not a fixed N.
-	// N grows with range: N = clamp(outerKm / divisor, min, max)
-	let N = clamp(Math.round(maxKm / C.GRID_SIZE_DIVISOR), C.GRID_SIZE_MIN, C.GRID_SIZE_MAX);
+	// N grows with range: N = ClampNumber(outerKm / divisor, min, max)
+	let N = ClampNumber(Math.round(maxKm / C.GRID_SIZE_DIVISOR), C.GRID_SIZE_MIN, C.GRID_SIZE_MAX);
 
 
 	const pts = [];

@@ -156,7 +156,17 @@ C.SHEET_TRANSITION_MS				= 350;	// wait after CSS sheet animation before calling
 C.CANVAS_PADDING					= 0.5;	// Leaflet canvas renderer padding factor
 
 C.EP_MARKER_SIZE_PX					= 18;	// width and height of numbered endpoint markers
-C.EP_MARKER_Z_OFFSET				= 100;	// zIndexOffset keeps endpoint markers above polygons
+C.EP_MARKER_Z_OFFSET					= 100;	// zIndexOffset keeps endpoint markers above polygons
+C.EP_MARKER_ANCHOR_PX				= 9;	// anchor for endpoint marker icons
+
+C.UI_TIME_MIN_HOURS				= 0.5;
+C.UI_TIME_MAX_HOURS				= 24;
+C.UI_TIME_STEP_HOURS				= 0.5;
+C.UI_DIST_MIN_KM					= 10;
+C.UI_DIST_MAX_KM					= 5000;
+C.UI_DIST_STEP_KM					= 10;
+
+C.UI_POINT_INSPECT_OFFSET_PX		= 14;
 
 // Expose as C on both window (browser) and global scope (worker)
 self.C = C;
