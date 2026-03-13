@@ -77,10 +77,10 @@ function ComputeSpeedClassFromRoadBands(roadBandsKm)
 
 	var speedClassScored = (
 		baseSpeedClass +
-		0.1 * densityScore +
-		1.2 * balanceScore +
-		0.1 * bandRatioScore +
-		0.5 * reachScore
+		0.2 * densityScore +
+		2 * balanceScore +
+		0.15 * bandRatioScore +
+		0.2 * reachScore
 	);
 
 	return RoundHalfUp(0.1 * Clamp(speedClassScored, [0, 10]), 2);
