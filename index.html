@@ -158,6 +158,63 @@
 
 		.leaflet-control-attribution { font-family: 'Source Sans 3', sans-serif; font-size: 10px; }
 
+		/* Buy Me a Coffee button */
+		#bmc-link {
+			position: fixed;
+			top: max(14px, env(safe-area-inset-top, 0px) + 10px);
+			right: max(14px, env(safe-area-inset-right, 0px) + 10px);
+			z-index: 1400;
+			display: inline-flex;
+			align-items: center;
+			gap: 10px;
+			padding: 10px 14px;
+			border-radius: 999px;
+			background: #FFDD00;
+			color: #0D0C22;
+			text-decoration: none;
+			font-family: 'Source Sans 3', sans-serif;
+			font-weight: 700;
+			font-size: 13px;
+			line-height: 1;
+			box-shadow: 0 8px 24px rgba(13, 12, 34, 0.22);
+			border: 1px solid rgba(13, 12, 34, 0.14);
+			backdrop-filter: blur(4px);
+			-webkit-tap-highlight-color: transparent;
+			animation: bmc-heartbeat 2.8s ease-in-out infinite;
+			transform-origin: center;
+		}
+		#bmc-link:hover {
+			transform: translateY(-1px);
+			box-shadow: 0 10px 28px rgba(13, 12, 34, 0.28);
+		}
+		#bmc-link:focus-visible {
+			outline: 3px solid rgba(13, 12, 34, 0.35);
+			outline-offset: 3px;
+		}
+		#bmc-link svg { flex-shrink: 0; }
+		#bmc-link .bmc-copy {
+			display: flex;
+			flex-direction: column;
+			gap: 2px;
+		}
+		#bmc-link .bmc-eyebrow {
+			font-size: 10px;
+			font-weight: 600;
+			letter-spacing: .04em;
+			text-transform: uppercase;
+			opacity: .72;
+		}
+		#bmc-link .bmc-title {
+			white-space: nowrap;
+		}
+		@keyframes bmc-heartbeat {
+			0%, 84%, 100% { transform: scale(1); }
+			88% { transform: scale(1.04); }
+			92% { transform: scale(0.985); }
+			96% { transform: scale(1.055); }
+		}
+
+
 		/* Mobile-only handle strip (hidden on desktop) */
 		#sheet-top { display: none; }
 
@@ -251,6 +308,15 @@
 			.leaflet-bottom.leaflet-right {
 				bottom: calc(var(--handle-h) + 10px) !important;
 			}
+
+			#bmc-link {
+				top: max(10px, env(safe-area-inset-top, 0px) + 6px);
+				right: max(10px, env(safe-area-inset-right, 0px) + 6px);
+				padding: 9px 12px;
+				gap: 8px;
+				font-size: 12px;
+			}
+			#bmc-link .bmc-eyebrow { display: none; }
 		}
 	</style>
 </head>
@@ -405,7 +471,20 @@
 	</div>
 </div>
 
+
 <div id="map"></div>
+
+<a id="bmc-link" href="https://buymeacoffee.com/pimhendrikd" target="_blank" rel="noopener noreferrer" aria-label="Support this project on Buy Me a Coffee">
+	<svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+		<path d="M6 8.25h9.5a1.75 1.75 0 0 1 1.75 1.75v3.25a4.75 4.75 0 0 1-4.75 4.75H10A4 4 0 0 1 6 14V8.25Z" fill="#ffffff" stroke="#0D0C22" stroke-width="1.5" stroke-linejoin="round"/>
+		<path d="M17.25 10h1.15a2.1 2.1 0 0 1 0 4.2h-1.15" stroke="#0D0C22" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+		<path d="M8.3 6.2c0-1.15.92-1.84 1.58-2.45M11.45 6.2c0-1.1.88-1.77 1.5-2.35" stroke="#0D0C22" stroke-width="1.5" stroke-linecap="round"/>
+	</svg>
+	<span class="bmc-copy">
+		<span class="bmc-eyebrow">Enjoying the tool?</span>
+		<span class="bmc-title">Buy me a coffee</span>
+	</span>
+</a>
 
 <!-- Mobile mini bar (shown when the sheet is collapsed) -->
 <div id="mini-bar" class="mini-bar mini-hidden" aria-label="Quick range controls">
