@@ -70,41 +70,40 @@ function showPointInspect(evt, point) {
 	if (!document.getElementById('show-grid').checked) return;
 	if (!pointInspect) return;
 
-	let pointLat = Number(point.lat);
-	let pointLng = Number(point.lng);
-	if (!Number.isFinite(pointLat) || !Number.isFinite(pointLng)) {
-		pointLat = Number(point[0]);
-		pointLng = Number(point[1]);
-	}
-	let tileSizeDeg = Number(C.ROADS_TILE_SIZE_DEG);
-	if (!Number.isFinite(tileSizeDeg) || tileSizeDeg <= 0) tileSizeDeg = 0.5;
-	const tileEps = Number.isFinite(C.TILE_KEY_EPSILON) ? C.TILE_KEY_EPSILON : 0;
-	const tileLatUnits = Math.floor((pointLat / tileSizeDeg) + tileEps);
-	const tileLngUnits = Math.floor((pointLng / tileSizeDeg) + tileEps);
-	const tileLat = tileLatUnits * tileSizeDeg;
-	const tileLng = tileLngUnits * tileSizeDeg;
+	const pointLat = point.lat !== undefined ? point.lat : point[0];
+	const pointLng = point.lng !== undefined ? point.lng : point[1];
+	const tileSizeDeg = Number(C.ROADS_TILE_SIZE_DEG);
+	const tileEps = Number(C.TILE_KEY_EPSILON);
+	const tileSizeSafe = Number.isFinite(tileSizeDeg) && tileSizeDeg > 0 ? tileSizeDeg : 0.5;
+	const tileEpsSafe = Number.isFinite(tileEps) ? tileEps : 0;
+	const tileLatUnits = Math.floor((pointLat / tileSizeSafe) + tileEpsSafe);
+	const tileLngUnits = Math.floor((pointLng / tileSizeSafe) + tileEpsSafe);
+	const tileLat = tileLatUnits * tileSizeSafe;
+	const tileLng = tileLngUnits * tileSizeSafe;
 
 	const landName = point.landType === C.CELL_WATER
 		? 'water'
 		: point.landType === C.CELL_CROSSING
 			? 'crossing'
 			: 'land';
-	let speedName = '-';
-	if (point.speedClass !== null && point.speedClass !== undefined) {
-		speedName = point.speedClass === C.SPEED_CLASS_MAX
-			? 'max'
-			: point.speedClass === C.SPEED_CLASS_LOW
-				? 'low'
-				: 'average';
-	}
-
 	const speedValue = point.speedClass === null || point.speedClass === undefined ? '-' : point.speedClass;
 	const roadBandsValue = Array.isArray(point.roadBands) && point.roadBands.length >= 4
-		? point.roadBands.slice(0, 4).map(v => Number.isFinite(v) ? v.toFixed(1) : '-').join(',')
+		? '['
+			+ formatRoadBandInt(point.roadBands[0]) + ', '
+			+ formatRoadBandInt(point.roadBands[1]) + ', '
+			+ formatRoadBandInt(point.roadBands[2]) + ', '
+			+ formatRoadBandInt(point.roadBands[3])
+			+ ']'
 		: '-';
-	pointInspect.textContent = `tile ${tileLat.toFixed(1)} ${tileLng.toFixed(1)}\nlandType ${point.landType} ${landName}\nspeedClass ${speedValue} ${speedName}\nroadBands ${roadBandsValue}`;
+	pointInspect.textContent = `tile ${tileLat.toFixed(1)} ${tileLng.toFixed(1)}\nlandType ${point.landType} ${landName}\nspeedClass ${speedValue}\nroadBands ${roadBandsValue}`;
 	pointInspect.style.display = 'block';
 	movePointInspect(evt);
+}
+
+function formatRoadBandInt(value) {
+	const bandValue = Number(value);
+	if (!Number.isFinite(bandValue)) return '0';
+	return String(Math.round(bandValue));
 }
 
 function movePointInspect(evt) {
