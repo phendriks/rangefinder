@@ -6,21 +6,10 @@ C.CELL_WATER					= 0;
 C.CELL_LAND						= 1;
 C.CELL_CROSSING					= 2;
 
-// Point attributes
-C.ROAD_TYPE_MOTORWAY			= 0;
-C.ROAD_TYPE_LOCAL				= 1;
-
-C.SPEED_CLASS_MAX				= 0;
-C.SPEED_CLASS_AVERAGE			= 1;
-C.SPEED_CLASS_LOW				= 2;
-
 // Speed class scoring
 C.SPEED_CLASS_WEIGHTS			= [1, 0.8, 0.3, 0.15];
 C.SPEED_CLASS_DETERMINANTS		= [150, 125, 100, 75];
 C.SPEED_CLASS_GRID_SIZE			= 0.5;
-
-// Roads classification
-C.ROAD_PROXIMITY_RADIUS_KM		= 8;
 
 // Geodesy
 C.EARTH_RADIUS_KM				= 6371;
@@ -40,7 +29,11 @@ C.DELAUNAY_JITTER_HASH_B		= 43758.5453;
 C.DELAUNAY_JITTER_SALT_STEP		= 1013;
 
 // Ferry/bridge crossings consume more budget to model slower effective speed.
-C.CROSSING_DISTANCE_FACTOR		= 1.5;
+C.CROSSING_DISTANCE_FACTOR		= 1;
+
+// Dijkstra cost model
+C.USE_SPEEDCLASS_COST			= true;
+C.REQUIRE_ROADBANDS				= true;
 
 // Polygon buffering
 // Small absolute buffer in kilometres to reduce false coastal misses.

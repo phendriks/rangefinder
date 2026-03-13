@@ -34,8 +34,7 @@ function buildSitesMesh(clat, clng, maxKm) {
 		cellTypes[i] = classifyCell(sites[i].lat, sites[i].lng);
 	}
 	const landTypes = cellTypes;
-	const roadTypes = new Array(sites.length).fill(C.ROAD_TYPE_LOCAL);
-	const speedClasses = new Array(sites.length).fill(C.SPEED_CLASS_AVERAGE);
+	const speedClasses = new Array(sites.length).fill(null);
 	const densityFactors = new Array(sites.length).fill(null);
 	const fastRatios = new Array(sites.length).fill(null);
 	const roadBands = new Array(sites.length).fill(null);
@@ -44,7 +43,6 @@ function buildSitesMesh(clat, clng, maxKm) {
 		pts,
 		cellTypes,
 		landTypes,
-		roadTypes,
 		speedClasses,
 		densityFactors,
 		fastRatios,

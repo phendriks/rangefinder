@@ -83,6 +83,31 @@ self.onmessage = async (e) => {
 	}
 };
 
+
+function GetEdgeCostKm(mesh, fromIndex, toIndex) {
+	const { pts, cellTypes, speedClasses, roadBands } = mesh;
+	const cellType = cellTypes[toIndex];
+	const fromCellType = cellTypes[fromIndex];
+
+	const stepKm = haversineKm(pts[fromIndex], pts[toIndex]);
+
+	// Crossings must stay traversable even when roadBands or speedClass data is missing.
+	if ((cellType === C.CELL_CROSSING) || (fromCellType === C.CELL_CROSSING)) return stepKm * C.CROSSING_DISTANCE_FACTOR;
+
+	if (!C.USE_SPEEDCLASS_COST) return stepKm;
+
+	if (C.REQUIRE_ROADBANDS) {
+		const bands = roadBands?.[fromIndex];
+		if (!bands || bands.length !== 4) return Infinity;
+	}
+
+	const speedClass = speedClasses?.[fromIndex];
+	if (!Number.isFinite(speedClass) || speedClass <= 0) return Infinity;
+
+	return stepKm / speedClass;
+}
+
+
 function computeDistanceField(mesh, maxKm, clat, clng) {
 	const { pts, cellTypes, neighbors } = mesh;
 	const costs = new Array(pts.length).fill(Infinity);
@@ -113,9 +138,9 @@ function computeDistanceField(mesh, maxKm, clat, clng) {
 			const cellType = cellTypes[nIdx];
 			if (cellType === C.CELL_WATER) continue;
 
-			const stepKm = haversineKm(pts[idx], pts[nIdx]);
-			const multiplier = (cellType === C.CELL_CROSSING) ? C.CROSSING_DISTANCE_FACTOR : 1;
-			const newCost = baseCost + stepKm * multiplier;
+			const edgeCostKm = GetEdgeCostKm(mesh, idx, nIdx);
+			if (!Number.isFinite(edgeCostKm)) continue;
+			const newCost = baseCost + edgeCostKm;
 
 			if (newCost < costs[nIdx] && newCost <= maxKm) {
 				costs[nIdx] = newCost;
