@@ -34,24 +34,24 @@ self.onmessage = async (e) => {
 	self.postMessage({ type: 'status', msg: 'Building mesh...' });
 	const mesh = buildSitesMesh(clat, clng, outerKm);
 
-	// Let the app render debug dots only when requested.
-	if (debugGrid) {
-		self.postMessage({
-			type: 'grid',
-			pts: mesh.pts.map((p, idx) => {
-				const landType = mesh.landTypes[idx];
-				const hasLandEnums = landType !== C.CELL_WATER;
-				return {
-					lat: p[0],
-					lng: p[1],
-					cell: mesh.cellTypes[idx],
-					landType,
-					speedClass: hasLandEnums ? mesh.speedClasses[idx] : null,
-					roadBands: hasLandEnums ? mesh.roadBands?.[idx] : null
-				};
-			})
-		});
-	}
+	// Always send grid point data so the UI can enable Inspect grid after a calculation.
+	// Rendering the markers remains lazy on the main thread, so the expensive part still
+	// only happens when the toggle is actually enabled.
+	self.postMessage({
+		type: 'grid',
+		pts: mesh.pts.map((p, idx) => {
+			const landType = mesh.landTypes[idx];
+			const hasLandEnums = landType !== C.CELL_WATER;
+			return {
+				lat: p[0],
+				lng: p[1],
+				cell: mesh.cellTypes[idx],
+				landType,
+				speedClass: hasLandEnums ? mesh.speedClasses[idx] : null,
+				roadBands: hasLandEnums ? mesh.roadBands?.[idx] : null
+			};
+		})
+	});
 
 	self.postMessage({ type: 'status', msg: 'Walking land graph...' });
 	const costs = computeDistanceField(mesh, outerKm, clat, clng);
