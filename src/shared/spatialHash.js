@@ -12,8 +12,11 @@ function BuildSpatialHash(pointsXy, cellSize)
 {
 	var map = new Map();
 	for (var i = 0; i < pointsXy.length; i++) {
-		var cx = Math.floor(pointsXy[i].x / cellSize);
-		var cy = Math.floor(pointsXy[i].y / cellSize);
+		var pt = pointsXy[i];
+		var px = Array.isArray(pt) ? pt[0] : pt.x;
+		var py = Array.isArray(pt) ? pt[1] : pt.y;
+		var cx = Math.floor(px / cellSize);
+		var cy = Math.floor(py / cellSize);
 		var key = cx + ',' + cy;
 		var bucket = map.get(key);
 		if (!bucket) {
@@ -38,8 +41,11 @@ function FindNearestIndex(spatialHash, pointsXy, cellSize, x, y)
 			if (!bucket) continue;
 			for (var k = 0; k < bucket.length; k++) {
 				var idx = bucket[k];
-				var dx2 = pointsXy[idx].x - x;
-				var dy2 = pointsXy[idx].y - y;
+				var pt = pointsXy[idx];
+				var px = Array.isArray(pt) ? pt[0] : pt.x;
+				var py = Array.isArray(pt) ? pt[1] : pt.y;
+				var dx2 = px - x;
+				var dy2 = py - y;
 				var d2 = dx2 * dx2 + dy2 * dy2;
 				if (d2 < bestDist) {
 					bestDist = d2;

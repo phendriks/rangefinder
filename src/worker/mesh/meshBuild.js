@@ -35,8 +35,6 @@ function buildSitesMesh(clat, clng, maxKm) {
 	}
 	const landTypes = cellTypes;
 	const speedClasses = new Array(sites.length).fill(null);
-	const densityFactors = new Array(sites.length).fill(null);
-	const fastRatios = new Array(sites.length).fill(null);
 	const roadBands = new Array(sites.length).fill(null);
 
 	const mesh = {
@@ -44,8 +42,6 @@ function buildSitesMesh(clat, clng, maxKm) {
 		cellTypes,
 		landTypes,
 		speedClasses,
-		densityFactors,
-		fastRatios,
 		roadBands,
 		N,
 		minLat,
@@ -76,6 +72,8 @@ function buildSitesMesh(clat, clng, maxKm) {
 	mesh.neighbors = delaunayMesh.neighbors;
 	mesh.triangles = delaunayMesh.triangles;
 	mesh.xy = delaunayMesh.xy;
+	mesh.edgeCosts = buildEdgeCosts(mesh);
+	mesh.originHash = buildMeshOriginHash(mesh);
 	return mesh;
 }
 function buildDelaunayMesh(pts, clat, clng, N, stepKmHint) {
@@ -136,7 +134,7 @@ function buildDelaunayMesh(pts, clat, clng, N, stepKmHint) {
 function addNeighborEdge(neighbors, pts, a, b, maxEdgeKm) {
 	if (a === b) return;
 	if (a < 0 || b < 0 || a >= pts.length || b >= pts.length) return;
-	const d = haversineKm(pts[a], pts[b]);
+	const d = approxPointDistanceKm(pts[a], pts[b]);
 	if (!Number.isFinite(d) || d > maxEdgeKm) return;
 	const na = neighbors[a];
 	const nb = neighbors[b];
@@ -178,15 +176,13 @@ function lloydRelax(sites, minLat, maxLat, minLng, maxLng, clat, clng, N, stepKm
 		maxY: (maxLat - clat) * C.KM_PER_DEG_LAT
 	};
 
-	const samplePts = [];
+	const samplePts = new Array((N + 1) * (N + 1));
+	let sIdx = 0;
 	for (let i = 0; i <= N; i++) {
+		const y = (minLat + (i / N) * (maxLat - minLat) - clat) * C.KM_PER_DEG_LAT;
 		for (let j = 0; j <= N; j++) {
-			const lat = minLat + (i / N) * (maxLat - minLat);
-			const lng = minLng + (j / N) * (maxLng - minLng);
-			samplePts.push({
-				x: (lng - clng) * C.KM_PER_DEG_LAT * cosLat,
-				y: (lat - clat) * C.KM_PER_DEG_LAT
-			});
+			const x = (minLng + (j / N) * (maxLng - minLng) - clng) * C.KM_PER_DEG_LAT * cosLat;
+			samplePts[sIdx++] = [x, y];
 		}
 	}
 
@@ -195,25 +191,27 @@ function lloydRelax(sites, minLat, maxLat, minLng, maxLng, clat, clng, N, stepKm
 
 	for (let iter = 0; iter < C.LLOYD_ITERATIONS; iter++) {
 		const hash = BuildSpatialHash(xy, cellSize);
-		const sumX = new Array(xy.length).fill(0);
-		const sumY = new Array(xy.length).fill(0);
-		const count = new Array(xy.length).fill(0);
+		const sumX = new Float64Array(xy.length);
+		const sumY = new Float64Array(xy.length);
+		const count = new Uint16Array(xy.length);
 
 		for (let s = 0; s < samplePts.length; s++) {
 			const sp = samplePts[s];
-			const idx = FindNearestIndex(hash, xy, cellSize, sp.x, sp.y);
+			const idx = FindNearestIndex(hash, xy, cellSize, sp[0], sp[1]);
 			if (idx < 0) continue;
-			sumX[idx] += sp.x;
-			sumY[idx] += sp.y;
+			sumX[idx] += sp[0];
+			sumY[idx] += sp[1];
 			count[idx] += 1;
 		}
 
 		for (let i = 0; i < xy.length; i++) {
 			if (!count[i]) continue;
+			const px = xy[i][0];
+			const py = xy[i][1];
 			const cx = sumX[i] / count[i];
 			const cy = sumY[i] / count[i];
-			xy[i].x = ClampNumber(xy[i].x + (cx - xy[i].x) * C.LLOYD_ALPHA, bounds.minX, bounds.maxX);
-			xy[i].y = ClampNumber(xy[i].y + (cy - xy[i].y) * C.LLOYD_ALPHA, bounds.minY, bounds.maxY);
+			xy[i][0] = ClampNumber(px + (cx - px) * C.LLOYD_ALPHA, bounds.minX, bounds.maxX);
+			xy[i][1] = ClampNumber(py + (cy - py) * C.LLOYD_ALPHA, bounds.minY, bounds.maxY);
 		}
 	}
 
@@ -226,10 +224,10 @@ function sitesToXy(sites, clat, clng) {
 	for (let i = 0; i < sites.length; i++) {
 		const lat = sites[i].lat;
 		const lng = sites[i].lng;
-		xy[i] = {
-			x: (lng - clng) * C.KM_PER_DEG_LAT * cosLat,
-			y: (lat - clat) * C.KM_PER_DEG_LAT
-		};
+		xy[i] = [
+			(lng - clng) * C.KM_PER_DEG_LAT * cosLat,
+			(lat - clat) * C.KM_PER_DEG_LAT
+		];
 	}
 	return xy;
 }
@@ -237,11 +235,14 @@ function sitesToXy(sites, clat, clng) {
 function xyToSites(xy, clat, clng) {
 	const refLatRad = clat * Math.PI / 180;
 	const cosLat = Math.cos(refLatRad);
+	const invLngScale = 1 / (C.KM_PER_DEG_LAT * cosLat);
+	const invLatScale = 1 / C.KM_PER_DEG_LAT;
 	const sites = new Array(xy.length);
 	for (let i = 0; i < xy.length; i++) {
+		const p = xy[i];
 		sites[i] = {
-			lat: clat + (xy[i].y / C.KM_PER_DEG_LAT),
-			lng: clng + (xy[i].x / (C.KM_PER_DEG_LAT * cosLat))
+			lat: clat + (p[1] * invLatScale),
+			lng: clng + (p[0] * invLngScale)
 		};
 	}
 	return sites;
@@ -251,14 +252,7 @@ function sampleCostsToRaster(mesh, costs, raster) {
 	const clng = mesh.clng;
 	const refLatRad = clat * Math.PI / 180;
 	const cosLat = Math.cos(refLatRad);
-
-	const sitesXy = new Array(mesh.pts.length);
-	for (let i = 0; i < mesh.pts.length; i++) {
-		sitesXy[i] = {
-			x: (mesh.pts[i][1] - clng) * C.KM_PER_DEG_LAT * cosLat,
-			y: (mesh.pts[i][0] - clat) * C.KM_PER_DEG_LAT
-		};
-	}
+	const sitesXy = mesh.xy;
 
 	const cellSize = Math.max(1, mesh.stepKmHint) * C.RASTER_HASH_CELL_FACTOR;
 	const hash = BuildSpatialHash(sitesXy, cellSize);
@@ -275,4 +269,72 @@ function sampleCostsToRaster(mesh, costs, raster) {
 	}
 
 	return out;
+}
+
+
+function approxPointDistanceKm(a, b) {
+	const avgLatRad = ((a[0] + b[0]) * 0.5) * Math.PI / 180;
+	const dy = (b[0] - a[0]) * C.KM_PER_DEG_LAT;
+	const dx = (b[1] - a[1]) * C.KM_PER_DEG_LAT * Math.cos(avgLatRad);
+	return Math.sqrt((dx * dx) + (dy * dy));
+}
+
+function buildEdgeCosts(mesh) {
+	const neighbors = mesh.neighbors || [];
+	const cellTypes = mesh.cellTypes || [];
+	const speedClasses = mesh.speedClasses || [];
+	const roadBands = mesh.roadBands || [];
+	const xy = mesh.xy || [];
+	const edgeCosts = new Array(neighbors.length);
+
+	for (let i = 0; i < neighbors.length; i++) {
+		const nbs = neighbors[i] || [];
+		const fromCellType = cellTypes[i];
+		const fromBands = roadBands[i];
+		const speedClass = speedClasses[i];
+		const row = new Array(nbs.length);
+
+		for (let k = 0; k < nbs.length; k++) {
+			const nIdx = nbs[k];
+			const cellType = cellTypes[nIdx];
+			const dx = xy[nIdx][0] - xy[i][0];
+			const dy = xy[nIdx][1] - xy[i][1];
+			const stepKm = Math.sqrt((dx * dx) + (dy * dy));
+
+			if ((cellType === C.CELL_CROSSING) || (fromCellType === C.CELL_CROSSING)) {
+				row[k] = stepKm * C.CROSSING_DISTANCE_FACTOR;
+				continue;
+			}
+
+			if (!C.USE_SPEEDCLASS_COST) {
+				row[k] = stepKm;
+				continue;
+			}
+
+			if (C.REQUIRE_ROADBANDS && (!fromBands || fromBands.length !== 4)) {
+				row[k] = Infinity;
+				continue;
+			}
+
+			if (!Number.isFinite(speedClass) || speedClass <= 0) {
+				row[k] = Infinity;
+				continue;
+			}
+
+			row[k] = stepKm / speedClass;
+		}
+
+		edgeCosts[i] = row;
+	}
+
+	return edgeCosts;
+}
+
+function buildMeshOriginHash(mesh) {
+	if (!mesh || !mesh.xy || !mesh.xy.length) return null;
+	const cellSize = Math.max(1, mesh.stepKmHint) * C.RASTER_HASH_CELL_FACTOR;
+	return {
+		cellSize,
+		hash: BuildSpatialHash(mesh.xy, cellSize)
+	};
 }

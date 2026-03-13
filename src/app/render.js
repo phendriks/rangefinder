@@ -2,6 +2,7 @@ const pointInspect = document.getElementById('pi');
 
 let inspectPoints = [];
 let inspectPointPixels = [];
+let gridSourceData = [];
 let inspectRafHandle = null;
 let inspectPendingEvent = null;
 
@@ -124,12 +125,17 @@ map.on('moveend', () => updateInspectPixels());
 map.on('zoomend', () => updateInspectPixels());
 
 function renderGrid(pts) {
+	gridSourceData = pts || [];
 	gridMarkers.forEach(m => map.removeLayer(m));
 	gridMarkers = [];
-	setInspectPoints(pts);
 
 	const showGrid = document.getElementById('show-grid').checked;
+	if (!showGrid || !pts || !pts.length) {
+		setInspectPoints([]);
+		return;
+	}
 
+	setInspectPoints(pts);
 	pts.forEach(p => {
 		const crossing = p.cell === C.CELL_CROSSING;
 		const land = p.cell === C.CELL_LAND;

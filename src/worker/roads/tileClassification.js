@@ -7,7 +7,7 @@ function AssignRoadEnums(mesh)
 {
 	if (!mesh) return;
 	if (!mesh.pts || !mesh.landTypes) return;
-	if (!mesh.speedClasses || !mesh.densityFactors || !mesh.fastRatios) return;
+	if (!mesh.speedClasses) return;
 	if (typeof GetRoadTileStats !== 'function') return;
 	if (typeof GetRoadTileKeyFromLatLng !== 'function') return;
 
@@ -48,7 +48,5 @@ function AssignRoadEnums(mesh)
 		var densityFactor = capTotal / (capTotal + C.ROAD_CAP_HALF);
 		var fastRatio = fastShare * densityFactor;
 
-		mesh.densityFactors[pointIndex] = densityFactor;
-		mesh.fastRatios[pointIndex] = fastRatio;
 	}
 }

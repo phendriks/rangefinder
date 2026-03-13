@@ -24,7 +24,7 @@ importScripts('contour/contour.js');
 
 self.onmessage = async (e) => {
 	try {
-	const { outerKm, innerKm, clat, clng } = e.data;
+	const { outerKm, innerKm, clat, clng, debugGrid } = e.data;
 
 	if (!Number.isFinite(outerKm) || outerKm <= 0) throw new Error('Invalid outerKm.');
 	if (!Number.isFinite(clat) || !Number.isFinite(clng)) throw new Error('Invalid center coordinate.');
@@ -34,11 +34,11 @@ self.onmessage = async (e) => {
 	self.postMessage({ type: 'status', msg: 'Building mesh...' });
 	const mesh = buildSitesMesh(clat, clng, outerKm);
 
-	// Let the app render debug dots if enabled.
-	self.postMessage({
-		type: 'grid',
-		pts: mesh.pts
-			.map((p, idx) => {
+	// Let the app render debug dots only when requested.
+	if (debugGrid) {
+		self.postMessage({
+			type: 'grid',
+			pts: mesh.pts.map((p, idx) => {
 				const landType = mesh.landTypes[idx];
 				const hasLandEnums = landType !== C.CELL_WATER;
 				return {
@@ -50,7 +50,8 @@ self.onmessage = async (e) => {
 					roadBands: hasLandEnums ? mesh.roadBands?.[idx] : null
 				};
 			})
-	});
+		});
+	}
 
 	self.postMessage({ type: 'status', msg: 'Walking land graph...' });
 	const costs = computeDistanceField(mesh, outerKm, clat, clng);
@@ -84,38 +85,14 @@ self.onmessage = async (e) => {
 };
 
 
-function GetEdgeCostKm(mesh, fromIndex, toIndex) {
-	const { pts, cellTypes, speedClasses, roadBands } = mesh;
-	const cellType = cellTypes[toIndex];
-	const fromCellType = cellTypes[fromIndex];
-
-	const stepKm = haversineKm(pts[fromIndex], pts[toIndex]);
-
-	// Crossings must stay traversable even when roadBands or speedClass data is missing.
-	if ((cellType === C.CELL_CROSSING) || (fromCellType === C.CELL_CROSSING)) return stepKm * C.CROSSING_DISTANCE_FACTOR;
-
-	if (!C.USE_SPEEDCLASS_COST) return stepKm;
-
-	if (C.REQUIRE_ROADBANDS) {
-		const bands = roadBands?.[fromIndex];
-		if (!bands || bands.length !== 4) return Infinity;
-	}
-
-	const speedClass = speedClasses?.[fromIndex];
-	if (!Number.isFinite(speedClass) || speedClass <= 0) return Infinity;
-
-	return stepKm / speedClass;
-}
-
-
 function computeDistanceField(mesh, maxKm, clat, clng) {
-	const { pts, cellTypes, neighbors } = mesh;
+	const { pts, cellTypes, neighbors, edgeCosts } = mesh;
 	const costs = new Array(pts.length).fill(Infinity);
 
 	// Snap origin to a non-water cell to avoid "coastline" failures on coarse grids.
-	let originIdx = findClosestIndex(pts, clat, clng);
-	if (cellTypes[originIdx] === C.CELL_WATER) {
-	originIdx = findClosestNonWaterIndex(pts, cellTypes, clat, clng);
+	let originIdx = findClosestMeshIndex(mesh, clat, clng, false);
+	if (originIdx >= 0 && cellTypes[originIdx] === C.CELL_WATER) {
+		originIdx = findClosestMeshIndex(mesh, clat, clng, true);
 	}
 	if (originIdx < 0) return costs;
 
@@ -124,21 +101,21 @@ function computeDistanceField(mesh, maxKm, clat, clng) {
 	heap.push({ idx: originIdx, cost: 0 });
 
 	while (true) {
-	const node = heap.pop();
-	if (!node) break;
+		const node = heap.pop();
+		if (!node) break;
 
-	const idx = node.idx;
-	const baseCost = node.cost;
-	if (baseCost !== costs[idx]) continue;
-	if (baseCost > maxKm) continue;
+		const idx = node.idx;
+		const baseCost = node.cost;
+		if (baseCost !== costs[idx]) continue;
+		if (baseCost > maxKm) continue;
 
 		const nbs = neighbors[idx];
+		const edgeRow = edgeCosts ? edgeCosts[idx] : null;
 		for (let k = 0; k < nbs.length; k++) {
 			const nIdx = nbs[k];
-			const cellType = cellTypes[nIdx];
-			if (cellType === C.CELL_WATER) continue;
+			if (cellTypes[nIdx] === C.CELL_WATER) continue;
 
-			const edgeCostKm = GetEdgeCostKm(mesh, idx, nIdx);
+			const edgeCostKm = edgeRow ? edgeRow[k] : Infinity;
 			if (!Number.isFinite(edgeCostKm)) continue;
 			const newCost = baseCost + edgeCostKm;
 
@@ -150,5 +127,49 @@ function computeDistanceField(mesh, maxKm, clat, clng) {
 	}
 
 	return costs;
+}
+
+function findClosestMeshIndex(mesh, lat, lng, requireNonWater) {
+	if (!mesh || !mesh.xy || !mesh.xy.length) return requireNonWater
+		? findClosestNonWaterIndex(mesh.pts, mesh.cellTypes, lat, lng)
+		: findClosestIndex(mesh.pts, lat, lng);
+
+	const cosLat = Math.cos(lat * Math.PI / 180);
+	const x = (lng - mesh.clng) * C.KM_PER_DEG_LAT * cosLat;
+	const y = (lat - mesh.clat) * C.KM_PER_DEG_LAT;
+	const originHash = mesh.originHash;
+	if (!originHash || !originHash.hash) return requireNonWater
+		? findClosestNonWaterIndex(mesh.pts, mesh.cellTypes, lat, lng)
+		: findClosestIndex(mesh.pts, lat, lng);
+
+	const idx = FindNearestIndex(originHash.hash, mesh.xy, originHash.cellSize, x, y);
+	if (!requireNonWater || idx < 0 || mesh.cellTypes[idx] !== C.CELL_WATER) return idx;
+
+	let best = -1;
+	let bestDist = Infinity;
+	const baseCx = Math.floor(x / originHash.cellSize);
+	const baseCy = Math.floor(y / originHash.cellSize);
+	for (let radius = 1; radius <= 3; radius++) {
+		for (let dy = -radius; dy <= radius; dy++) {
+			for (let dx = -radius; dx <= radius; dx++) {
+				const bucket = originHash.hash.get((baseCx + dx) + ',' + (baseCy + dy));
+				if (!bucket) continue;
+				for (let i = 0; i < bucket.length; i++) {
+					const candidate = bucket[i];
+					if (mesh.cellTypes[candidate] === C.CELL_WATER) continue;
+					const px = mesh.xy[candidate][0] - x;
+					const py = mesh.xy[candidate][1] - y;
+					const d2 = (px * px) + (py * py);
+					if (d2 < bestDist) {
+						bestDist = d2;
+						best = candidate;
+					}
+				}
+			}
+		}
+		if (best >= 0) return best;
+	}
+
+	return findClosestNonWaterIndex(mesh.pts, mesh.cellTypes, lat, lng);
 }
 

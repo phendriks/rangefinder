@@ -78,7 +78,8 @@ function computeIsoPolygonSites(mesh, costs, maxBandKm) {
 	let bestArea = -Infinity;
 	for (const ringXy of rings) {
 		if (ringXy.length < C.CONTOUR_MIN_RING_POINTS) continue;
-		let ring = ringXy.map(p => xyToLngLat(mesh, p));
+		let ring = new Array(ringXy.length);
+		for (let i = 0; i < ringXy.length; i++) ring[i] = xyToLngLat(mesh, ringXy[i]);
 		if (ring.length < C.CONTOUR_MIN_RING_POINTS) continue;
 		if (!samePoint(ring[0], ring[ring.length - 1])) ring.push(ring[0]);
 		const area = signedAreaLngLat(ring);

@@ -62,6 +62,10 @@ document.getElementById('dp').style.display = 'none';
 // Visibility toggles
 
 document.getElementById('show-grid').addEventListener('change', function () {
+	if (this.checked && (!gridMarkers || gridMarkers.length === 0) && Array.isArray(gridSourceData) && gridSourceData.length) {
+		renderGrid(gridSourceData);
+		return;
+	}
 	gridMarkers.forEach(m => this.checked ? map.addLayer(m) : map.removeLayer(m));
 	if (!this.checked) hidePointInspect();
 });
@@ -243,7 +247,7 @@ document.getElementById('calc').addEventListener('click', () => {
 		alert(`Worker error: ${e.message}`);
 	};
 
-	worker.postMessage({ clat: coords.lat, clng: coords.lng, outerKm, innerKm });
+	worker.postMessage({ clat: coords.lat, clng: coords.lng, outerKm, innerKm, debugGrid: document.getElementById('show-grid').checked });
 });
 
 function setStatus(msg, pct) {

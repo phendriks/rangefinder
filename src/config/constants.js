@@ -62,7 +62,7 @@ C.SITE_FILL_OPACITY_CROSSING	= 0.55;
 C.SITE_FILL_OPACITY_WATER		= 0.25;
 
 // Sampling
-C.LLOYD_ITERATIONS				= 2;
+C.LLOYD_ITERATIONS				= 1;
 C.LLOYD_ALPHA					= 0.2;
 C.LLOYD_JITTER_FACTOR			= .75;
 C.LLOYD_HASH_CELL_FACTOR		= 1.6;
@@ -89,13 +89,13 @@ C.TERRAIN_TAU_DEFAULT = 1;
 
 // Base speeds calibrated against 'real' drives
 C.MODE_SPEED_KMH = {
-	drive						: 105,
-	moto						: 100,
+	drive						: 120,
+	moto						: 110,
 };
 
 C.MODE_NOTE = {
-	drive	: '105 km/h base, tau_mode 1.20 (Giacomin & Levinson 2015)',
-	moto	: '100 km/h base, tau_mode 1.15, filters traffic and handles mountain passes better',
+	drive	: '120 km/h base, tau_mode 1.20 (Giacomin & Levinson 2015)',
+	moto	: '110 km/h base, tau_mode 1.15, filters traffic and handles mountain passes better',
 };
 
 	// Country polygons are loaded from countries-natural-earth.js

@@ -35,13 +35,15 @@ function buildGrid(clat, clng, maxKm) {
 	return { pts, cellTypes, N, minLat, maxLat, minLng, maxLng, neighbors };
 }
 function buildRasterGrid(mesh) {
-	const pts = [];
 	const N = mesh.N;
+	const side = N + 1;
+	const pts = new Array(side * side);
+	let idx = 0;
 	for (let i = 0; i <= N; i++) {
+		const lat = mesh.minLat + (i / N) * (mesh.maxLat - mesh.minLat);
 		for (let j = 0; j <= N; j++) {
-			const lat = mesh.minLat + (i / N) * (mesh.maxLat - mesh.minLat);
 			const lng = mesh.minLng + (j / N) * (mesh.maxLng - mesh.minLng);
-			pts.push([lat, lng]);
+			pts[idx++] = [lat, lng];
 		}
 	}
 	return { pts, N, minLat: mesh.minLat, maxLat: mesh.maxLat, minLng: mesh.minLng, maxLng: mesh.maxLng };

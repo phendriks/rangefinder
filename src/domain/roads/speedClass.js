@@ -18,62 +18,52 @@ function ComputeSpeedClassFromRoadBands(roadBandsKm)
 {
 	if (!roadBandsKm || roadBandsKm.length < 4) return null;
 
-	var safeRoadBandsKm = [
-		Number(roadBandsKm[0]) || 0,
-		Number(roadBandsKm[1]) || 0,
-		Number(roadBandsKm[2]) || 0,
-		Number(roadBandsKm[3]) || 0
-	];
-	for (var bandIndex = 0; bandIndex < safeRoadBandsKm.length; bandIndex++) {
-		if (safeRoadBandsKm[bandIndex] === 0) safeRoadBandsKm[bandIndex] = 1;
-	}
+	var fastKm = Number(roadBandsKm[0]) || 0;
+	var mainKm = Number(roadBandsKm[1]) || 0;
+	var midKm = Number(roadBandsKm[2]) || 0;
+	var localKm = Number(roadBandsKm[3]) || 0;
 
-	var determinants = C.SPEED_CLASS_DETERMINANTS.map(function(km) {
-		return km * C.SPEED_CLASS_GRID_SIZE;
-	});
+	if (fastKm === 0) fastKm = 1;
+	if (mainKm === 0) mainKm = 1;
+	if (midKm === 0) midKm = 1;
+	if (localKm === 0) localKm = 1;
 
-	var rules = [
-		{ score: 5, conditions: [{ index: 0, limit: determinants[0] }] },
-		{ score: 4, conditions: [{ index: 0, limit: determinants[1] }, { index: 1, limit: determinants[0] }] },
-		{ score: 3, conditions: [{ index: 0, limit: determinants[2] }, { index: 1, limit: determinants[1] }] },
-		{ score: 2, conditions: [{ index: 0, limit: determinants[3] }, { index: 1, limit: determinants[2] }, { index: 2, limit: determinants[0] }] },
-		{ score: 1, conditions: [{ index: 0, limit: determinants[3] }, { index: 1, limit: determinants[3] }, { index: 2, limit: determinants[1] }] }
-	];
+	var det0 = C.SPEED_CLASS_DETERMINANTS[0] * C.SPEED_CLASS_GRID_SIZE;
+	var det1 = C.SPEED_CLASS_DETERMINANTS[1] * C.SPEED_CLASS_GRID_SIZE;
+	var det2 = C.SPEED_CLASS_DETERMINANTS[2] * C.SPEED_CLASS_GRID_SIZE;
+	var det3 = C.SPEED_CLASS_DETERMINANTS[3] * C.SPEED_CLASS_GRID_SIZE;
 
 	var baseSpeedClass = 0;
-	for (var ruleIndex = 0; ruleIndex < rules.length; ruleIndex++) {
-		var rule = rules[ruleIndex];
-		var meetsAny = false;
-		for (var conditionIndex = 0; conditionIndex < rule.conditions.length; conditionIndex++) {
-			var condition = rule.conditions[conditionIndex];
-			if (safeRoadBandsKm[condition.index] >= condition.limit) {
-				meetsAny = true;
-				break;
-			}
-		}
-		if (meetsAny) {
-			baseSpeedClass = rule.score;
-			break;
-		}
+	if (fastKm >= det0) {
+		baseSpeedClass = 5;
+	} else if (fastKm >= det1 || mainKm >= det0) {
+		baseSpeedClass = 4;
+	} else if (fastKm >= det2 || mainKm >= det1) {
+		baseSpeedClass = 3;
+	} else if (fastKm >= det3 || mainKm >= det2 || midKm >= det0) {
+		baseSpeedClass = 2;
+	} else if (fastKm >= det3 || mainKm >= det3 || midKm >= det1) {
+		baseSpeedClass = 1;
 	}
 
-	var weightedSum = 0;
-	for (var weightIndex = 0; weightIndex < C.SPEED_CLASS_WEIGHTS.length; weightIndex++) {
-		weightedSum += safeRoadBandsKm[weightIndex] * C.SPEED_CLASS_WEIGHTS[weightIndex];
-	}
+	var weightedSum =
+		(fastKm * C.SPEED_CLASS_WEIGHTS[0]) +
+		(mainKm * C.SPEED_CLASS_WEIGHTS[1]) +
+		(midKm * C.SPEED_CLASS_WEIGHTS[2]) +
+		(localKm * C.SPEED_CLASS_WEIGHTS[3]);
 	var densityScore = Math.sqrt(weightedSum);
 
-	var minBand = Math.min.apply(null, safeRoadBandsKm);
-	var maxBand = Math.max.apply(null, safeRoadBandsKm);
+	var minBand = Math.min(fastKm, mainKm, midKm, localKm);
+	var maxBand = Math.max(fastKm, mainKm, midKm, localKm);
 	var balanceScore = minBand / maxBand;
 
 	var bandRatioScore = (
-		C.SPEED_CLASS_WEIGHTS[0] * (safeRoadBandsKm[0] / safeRoadBandsKm[1]) +
-		C.SPEED_CLASS_WEIGHTS[1] * (safeRoadBandsKm[1] / safeRoadBandsKm[2]) +
-		C.SPEED_CLASS_WEIGHTS[2] * (safeRoadBandsKm[2] / safeRoadBandsKm[3])
+		C.SPEED_CLASS_WEIGHTS[0] * (fastKm / mainKm) +
+		C.SPEED_CLASS_WEIGHTS[1] * (mainKm / midKm) +
+		C.SPEED_CLASS_WEIGHTS[2] * (midKm / localKm)
 	);
 
-	var reachScore = Math.sqrt(safeRoadBandsKm[2] + safeRoadBandsKm[3]);
+	var reachScore = Math.sqrt(midKm + localKm);
 
 	var speedClassScored = (
 		baseSpeedClass +
