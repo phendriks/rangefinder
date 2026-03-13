@@ -15,9 +15,9 @@ C.SPEED_CLASS_AVERAGE			= 1;
 C.SPEED_CLASS_LOW				= 2;
 
 // Speed class scoring
-C.SPEED_CLASS_WEIGHTS				= [1, 0.8, 0.3, 0.15];
+C.SPEED_CLASS_WEIGHTS			= [1, 0.8, 0.3, 0.15];
 C.SPEED_CLASS_DETERMINANTS		= [150, 125, 100, 75];
-C.SPEED_CLASS_GRID_SIZE			= 1.0;
+C.SPEED_CLASS_GRID_SIZE			= 0.5;
 
 // Roads classification
 C.ROAD_PROXIMITY_RADIUS_KM		= 8;
@@ -135,6 +135,7 @@ C.EUROPE_BBOX_MAX_LAT				= 72;
 
 // Roads tiles
 C.ROADS_TILE_SIZE_DEG				= 1;
+C.TILE_KEY_EPSILON					= 1e-9;
 
 // Road speed weights (relative travel capability per km)
 C.ROAD_SPEED_WEIGHT_FAST			= 1;	// motorway and trunks
@@ -156,11 +157,11 @@ C.SHEET_TRANSITION_MS				= 350;	// wait after CSS sheet animation before calling
 C.CANVAS_PADDING					= 0.5;	// Leaflet canvas renderer padding factor
 
 C.EP_MARKER_SIZE_PX					= 18;	// width and height of numbered endpoint markers
-C.EP_MARKER_Z_OFFSET					= 100;	// zIndexOffset keeps endpoint markers above polygons
+C.EP_MARKER_Z_OFFSET				= 100;	// zIndexOffset keeps endpoint markers above polygons
 C.EP_MARKER_ANCHOR_PX				= 9;	// anchor for endpoint marker icons
 
-C.UI_TIME_MIN_HOURS				= 0.5;
-C.UI_TIME_MAX_HOURS				= 24;
+C.UI_TIME_MIN_HOURS					= 0.5;
+C.UI_TIME_MAX_HOURS					= 24;
 C.UI_TIME_STEP_HOURS				= 0.5;
 C.UI_DIST_MIN_KM					= 10;
 C.UI_DIST_MAX_KM					= 5000;

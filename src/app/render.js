@@ -70,11 +70,19 @@ function showPointInspect(evt, point) {
 	if (!document.getElementById('show-grid').checked) return;
 	if (!pointInspect) return;
 
-	const pointLat = point.lat !== undefined ? point.lat : point[0];
-	const pointLng = point.lng !== undefined ? point.lng : point[1];
-	const tileSizeDeg = C.ROADS_TILE_SIZE_DEG;
-	const tileX = Math.floor((pointLng - C.EUROPE_BBOX_MIN_LNG) / tileSizeDeg);
-	const tileY = Math.floor((pointLat - C.EUROPE_BBOX_MIN_LAT) / tileSizeDeg);
+	let pointLat = Number(point.lat);
+	let pointLng = Number(point.lng);
+	if (!Number.isFinite(pointLat) || !Number.isFinite(pointLng)) {
+		pointLat = Number(point[0]);
+		pointLng = Number(point[1]);
+	}
+	let tileSizeDeg = Number(C.ROADS_TILE_SIZE_DEG);
+	if (!Number.isFinite(tileSizeDeg) || tileSizeDeg <= 0) tileSizeDeg = 0.5;
+	const tileEps = Number.isFinite(C.TILE_KEY_EPSILON) ? C.TILE_KEY_EPSILON : 0;
+	const tileLatUnits = Math.floor((pointLat / tileSizeDeg) + tileEps);
+	const tileLngUnits = Math.floor((pointLng / tileSizeDeg) + tileEps);
+	const tileLat = tileLatUnits * tileSizeDeg;
+	const tileLng = tileLngUnits * tileSizeDeg;
 
 	const landName = point.landType === C.CELL_WATER
 		? 'water'
@@ -94,7 +102,7 @@ function showPointInspect(evt, point) {
 	const roadBandsValue = Array.isArray(point.roadBands) && point.roadBands.length >= 4
 		? point.roadBands.slice(0, 4).map(v => Number.isFinite(v) ? v.toFixed(1) : '-').join(',')
 		: '-';
-	pointInspect.textContent = `tile ${tileX} ${tileY}\nlandType ${point.landType} ${landName}\nspeedClass ${speedValue} ${speedName}\nroadBands ${roadBandsValue}`;
+	pointInspect.textContent = `tile ${tileLat.toFixed(1)} ${tileLng.toFixed(1)}\nlandType ${point.landType} ${landName}\nspeedClass ${speedValue} ${speedName}\nroadBands ${roadBandsValue}`;
 	pointInspect.style.display = 'block';
 	movePointInspect(evt);
 }
