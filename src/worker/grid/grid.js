@@ -14,7 +14,7 @@ function buildGrid(clat, clng, maxKm) {
 	const minLng = clng - lngDelta;
 	const maxLng = clng + lngDelta;
 
-	// IMPORTANT: constants.js defines GRID_SIZE_DIVISOR as a divisor, not a fixed N.
+	// IMPORTANT: shape-constants.js defines GRID_SIZE_DIVISOR as a divisor, not a fixed N.
 	// N grows with range: N = ClampNumber(outerKm / divisor, min, max)
 	let N = ClampNumber(Math.round(maxKm / C.GRID_SIZE_DIVISOR), C.GRID_SIZE_MIN, C.GRID_SIZE_MAX);
 

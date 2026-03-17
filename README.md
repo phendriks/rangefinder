@@ -27,3 +27,10 @@ src/data/countries-natural-earth.js:
 To use a higher detail dataset:
 
 	python3 scripts/build-country-polygons.py --50m
+
+## Config files
+
+- `src/config/base-constants.js`: shared primitives and global bounds
+- `src/config/travel-constants.js`: routing, roads, crossings, and `speedClass` tuning
+- `src/config/shape-constants.js`: grid, mesh, and contour generation
+- `src/config/ui-constants.js`: map defaults, colours, and browser/UI behaviour

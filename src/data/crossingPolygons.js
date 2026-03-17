@@ -1,5 +1,5 @@
 // crossing-polygons.js
-// Stable polygon data for crossings. Loaded after constants.js.
+// Stable polygon data for crossings. Loaded after the config constant files.
 
 C.CROSSING_POLYGONS = [
 	['English Channel', [

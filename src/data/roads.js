@@ -2,8 +2,6 @@
 // Offline road kilometre tiles for Europe and nearby Atlantic regions
 // Synthetic data for development only
 
-C.ROADS_SOURCE = 'offline';
-
 C.ROADS_TILES = {
 	'34.5_32.5': { fast: 2, main: 9, mid: 13, local: 21 },
 	'34.5_33.0': { fast: 2, main: 9, mid: 13, local: 21 },

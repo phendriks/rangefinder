@@ -6,7 +6,10 @@
 importScripts('https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js');
 importScripts('https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js');
 importScripts('https://cdn.jsdelivr.net/npm/delaunator@5/delaunator.min.js');
-importScripts('../config/constants.js');
+importScripts('../config/base-constants.js');
+importScripts('../config/travel-constants.js');
+importScripts('../config/shape-constants.js');
+importScripts('../config/ui-constants.js');
 importScripts('../shared/math.js');
 importScripts('../shared/geo.js');
 importScripts('../shared/minHeap.js');
