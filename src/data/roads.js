@@ -3509,17 +3509,7 @@ function GetRoadTileKeyFromLatLng(lat, lng)
 	return tileLat.toFixed(1) + '_' + tileLng.toFixed(1);
 }
 
-function GetRoadTileKey(lat, lng)
-{
-	return GetRoadTileKeyFromLatLng(lat, lng);
-}
-
 function GetRoadTileStats(tileKey)
 {
 	return C.ROADS_TILES[tileKey] || null;
-}
-
-function GetRoadTilePoints(tileKey)
-{
-	return null;
 }
