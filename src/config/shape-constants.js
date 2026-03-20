@@ -4,10 +4,9 @@
 var C = self.C || (self.C = {});
 
 // Isobands
-C.ISOBAND_UNREACHED_COST_FACTOR = 1000;
+C.ISOBAND_UNREACHED_COST_FACTOR     = 1000;
 
-// Polygon buffering
-// Small absolute buffer in kilometres to reduce false coastal misses.
+// Small buffer in absolute kilometres to reduce false coastal misses.
 C.POLYGON_BUFFER_KM					= 10;
 
 // Land grid
@@ -39,5 +38,4 @@ C.CONTOUR_MAX_STEPS					= 200000;
 C.CONTOUR_MIN_RING_POINTS			= 4;
 C.CONTOUR_SIMPLIFY_MIN_KM			= 1.2;
 C.CONTOUR_SMOOTH_ITERATIONS			= 1;
-C.CONTOUR_AREA_RATIO_MIN			= 0.85;
-C.CONTOUR_AREA_RATIO_MAX			= 1.15;
+C.CONTOUR_AREA_RATIO                = 0.15;

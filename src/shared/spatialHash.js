@@ -1,6 +1,5 @@
 // spatialHash.js
 // Shared deterministic hashing and spatial indexing helpers.
-//TODO: store functions in a central helper database
 
 function Hash01(indexValue, salt)
 {

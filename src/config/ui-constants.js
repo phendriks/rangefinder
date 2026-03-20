@@ -27,16 +27,16 @@ C.REVERSE_GEOCODE_ZOOM				= 18;
 // Map and UI layout
 C.MAP_INITIAL_CENTER				= [48, 10];
 C.MAP_INITIAL_ZOOM					= 5;
-C.MAP_GEOCODE_ZOOM					= 10; // zoom level used when flying to a geocoded result
-C.MAP_FIT_PADDING_PX				= 40; // px padding passed to fitBounds
+C.MAP_GEOCODE_ZOOM					= 10;   // zoom level used when flying to a geocoded result
+C.MAP_FIT_PADDING_PX				= 40;   // px padding passed to fitBounds
 C.MOBILE_BREAKPOINT_PX				= 640;
 C.SIDEBAR_WIDTH_PX					= 300;
-C.SHEET_TRANSITION_MS				= 350; // wait after CSS sheet animation before calling invalidateSize
-C.CANVAS_PADDING					= 0.5; // Leaflet canvas renderer padding factor
+C.SHEET_TRANSITION_MS				= 350;  // wait after CSS sheet animation before calling invalidateSize
+C.CANVAS_PADDING					= 0.5;  // Leaflet canvas renderer padding factor
 
-C.EP_MARKER_SIZE_PX					= 18; // width and height of numbered endpoint markers
-C.EP_MARKER_Z_OFFSET				= 100; // zIndexOffset keeps endpoint markers above polygons
-C.EP_MARKER_ANCHOR_PX				= 9; // anchor for endpoint marker icons
+C.EP_MARKER_SIZE_PX					= 18;   // width and height of numbered endpoint markers
+C.EP_MARKER_Z_OFFSET				= 100;  // zIndexOffset keeps endpoint markers above polygons
+C.EP_MARKER_ANCHOR_PX				= 9;    // anchor for endpoint marker icons
 
 C.UI_TIME_MIN_HOURS					= 0.5;
 C.UI_TIME_MAX_HOURS					= 24;

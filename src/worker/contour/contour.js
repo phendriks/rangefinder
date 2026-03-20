@@ -221,7 +221,7 @@ function beautifyRing(ring, mesh) {
 	const a1 = turf.area(poly1);
 	if (!a0 || !a1) return orig;
 	const ratio = a1 / a0;
-	if (ratio < C.CONTOUR_AREA_RATIO_MIN || ratio > C.CONTOUR_AREA_RATIO_MAX) return orig;
+	if (ratio < (1 - C.CONTOUR_AREA_RATIO) || ratio > (1 + C.CONTOUR_AREA_RATIO)) return orig;
 
 	return out;
 }

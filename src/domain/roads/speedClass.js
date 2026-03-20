@@ -50,10 +50,10 @@ function ComputeSpeedClassFromRoadBands(roadBandsKm)
 	var speedBand = Math.max(0, maxValue - minValue);
 	if (!(speedBand > 0)) return RoundHalfUp(minValue, 2);
 
-	var capFast = fastKm * C.ROAD_SPEED_WEIGHT_FAST;
-	var capMain = mainKm * C.ROAD_SPEED_WEIGHT_MAIN;
-	var capMid = midKm * C.ROAD_SPEED_WEIGHT_MID;
-	var capLocal = localKm * C.ROAD_SPEED_WEIGHT_LOCAL;
+	var capFast = fastKm * C.ROAD_SPEED_WEIGHT[0];
+	var capMain = mainKm * C.ROAD_SPEED_WEIGHT[1];
+	var capMid = midKm * C.ROAD_SPEED_WEIGHT[2];
+	var capLocal = localKm * C.ROAD_SPEED_WEIGHT[3];
 	var capTotal = capFast + capMain + capMid + capLocal;
 	if (!Number.isFinite(capTotal) || capTotal < 0) return null;
 
