@@ -183,7 +183,6 @@ function renderResults(workerResult, meta, legOTxt, legITxt) {
 
 	epMarkers.forEach(m => map.removeLayer(m));
 	epMarkers = [];
-	const showPts = document.getElementById('show-pts').checked;
 
 	outerRing.forEach(([lng, lat], idx) => {
 		const icon = L.divIcon({
@@ -193,8 +192,6 @@ function renderResults(workerResult, meta, legOTxt, legITxt) {
 			iconAnchor: [C.EP_MARKER_ANCHOR_PX, C.EP_MARKER_ANCHOR_PX]
 		});
 		const marker = L.marker([lat, lng], { icon, zIndexOffset: C.EP_MARKER_Z_OFFSET });
-		if (showPts) marker.addTo(map);
-		epMarkers.push(marker);
 	});
 
 	map.fitBounds(outerLayer.getBounds(), { padding: [C.MAP_FIT_PADDING_PX, C.MAP_FIT_PADDING_PX] });

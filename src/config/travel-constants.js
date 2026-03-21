@@ -48,8 +48,8 @@ C.ROAD_SPEED_CLASS_MAX				= 1.0; // a perfect speedClass, improbably but possibl
 C.CROSSING_SPEED_CLASS				= 0.85;
 
 // Calibrated score shaping
-C.ROAD_CALIBRATED_DENSITY_WEIGHT	= 0.35; // higher = rounder/more generous
-C.ROAD_CALIBRATED_FAST_SHARE_WEIGHT	= 0.25; // higher = motorway-heavy areas score better
+C.ROAD_CALIBRATED_DENSITY_WEIGHT	= 0.35;	// higher = rounder/more generous
+C.ROAD_CALIBRATED_FAST_SHARE_WEIGHT	= 0.25;	// higher = motorway-heavy areas score better
 
 // Shape variation folded into the single speedClass function.
 C.ROAD_VARIATION_STRENGTH			= 0.75; // Higher = more texture

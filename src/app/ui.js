@@ -70,10 +70,6 @@ document.getElementById('show-grid').addEventListener('change', function () {
 	if (!this.checked) hidePointInspect();
 });
 
-document.getElementById('show-pts').addEventListener('change', function () {
-	epMarkers.forEach(m => this.checked ? map.addLayer(m) : map.removeLayer(m));
-});
-
 
 // Geocoding
 
