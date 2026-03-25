@@ -1,6 +1,5 @@
 // minHeap.js
 // Shared heap implementation.
-//TODO: store functions in a central helper database
 
 class MinHeap {
 	constructor() { this.items = []; }

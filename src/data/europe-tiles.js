@@ -1,9 +1,97 @@
-// roads.js
-// Offline road kilometre tiles for Europe and nearby Atlantic regions
-// Synthetic data for development only
-// Region-aware heuristic: few plateaus, deterministic variation, and support for major European road belts.
+// europe-tiles.js
+// Offline network tiles for Europe and nearby Atlantic regions.
+// Road tiles are stored explicitly and terrain is synthesized per tile.
 
-C.ROADS_TILES = {
+const EUROPE_BOUNDS = {
+	minLat: 34,
+	maxLat: 72,
+	minLng: -12,
+	maxLng: 45
+};
+
+const EUROPE_TERRAIN_RELIEF_HUBS = [
+	{ lat: 51.5072, lng: -0.1276, weight: 0.54, radiusKm: 220 },
+	{ lat: 48.8566, lng: 2.3522, weight: 0.58, radiusKm: 240 },
+	{ lat: 50.1109, lng: 8.6821, weight: 0.50, radiusKm: 220 },
+	{ lat: 45.4642, lng: 9.1900, weight: 0.42, radiusKm: 180 },
+	{ lat: 52.5200, lng: 13.4050, weight: 0.46, radiusKm: 220 },
+	{ lat: 41.3851, lng: 2.1734, weight: 0.30, radiusKm: 170 }
+];
+
+const EUROPE_TERRAIN_RELIEF_PATHS = [
+	{ path: [[-1.0, 51.0], [2.0, 50.5], [7.0, 50.0], [13.0, 52.0], [20.0, 52.0]], weight: 0.54, radiusKm: 180 },
+	{ path: [[-9.0, 38.7], [2.2, 41.4], [7.7, 45.0], [14.5, 45.8]], weight: 0.26, radiusKm: 170 },
+	{ path: [[12.5, 41.9], [14.3, 40.8], [16.9, 41.1]], weight: 0.18, radiusKm: 130 }
+];
+
+const EUROPE_TERRAIN_MOUNTAIN_PATHS = [
+	{ path: [[-1.8, 43.0], [2.5, 42.8], [6.5, 45.0], [10.5, 46.2], [13.6, 46.0]], weight: 0.72, radiusKm: 150 },
+	{ path: [[13.0, 45.5], [18.0, 44.5], [21.0, 43.5]], weight: 0.34, radiusKm: 130 },
+	{ path: [[17.0, 49.0], [22.5, 48.7], [25.5, 47.0]], weight: 0.44, radiusKm: 150 },
+	{ path: [[8.0, 60.0], [12.0, 63.0], [18.0, 67.0]], weight: 0.42, radiusKm: 170 },
+	{ path: [[-19.0, 64.9], [-17.0, 64.4], [-16.0, 65.0]], weight: 0.52, radiusKm: 160 },
+	{ path: [[12.3, 43.1], [14.0, 42.5], [16.0, 40.0]], weight: 0.28, radiusKm: 120 }
+];
+
+const EUROPE_TERRAIN_ROUGH_ZONES = [
+	{ minLat: 38, maxLat: 42.5, minLng: -6, maxLng: 1, weight: 0.12 },
+	{ minLat: 43, maxLat: 48, minLng: 18, maxLng: 27, weight: 0.18 },
+	{ minLat: 57, maxLat: 66, minLng: 5, maxLng: 25, weight: 0.18 },
+	{ minLat: 63, maxLat: 67, minLng: -22, maxLng: -12, weight: 0.26 }
+];
+
+const EUROPE_TERRAIN_HARSH_ZONES = [
+	{ minLat: 45, maxLat: 47.5, minLng: 6, maxLng: 15, weight: 0.42 },
+	{ minLat: 64, maxLat: 71, minLng: 18, maxLng: 32, weight: 0.34 },
+	{ minLat: 63, maxLat: 67, minLng: -20, maxLng: -14, weight: 0.38 }
+];
+
+const EUROPE_TERRAIN_EXTREME_ZONES = [
+	{ minLat: 64, maxLat: 67, minLng: -19, maxLng: -15, weight: 0.68 }
+];
+
+const EUROPE_TERRAIN_CONFIG = {
+	terrainBaseScore: 0.10,
+	terrainNoiseSeed: 401,
+	terrainReliefHubs: EUROPE_TERRAIN_RELIEF_HUBS,
+	terrainReliefPaths: EUROPE_TERRAIN_RELIEF_PATHS,
+	terrainMountainPaths: EUROPE_TERRAIN_MOUNTAIN_PATHS,
+	terrainRoughZones: EUROPE_TERRAIN_ROUGH_ZONES,
+	terrainHarshZones: EUROPE_TERRAIN_HARSH_ZONES,
+	terrainExtremeZones: EUROPE_TERRAIN_EXTREME_ZONES,
+	getTerrainPenaltyScore: getEuropeTerrainPenaltyScore,
+	getTerrainReliefScore: getEuropeTerrainReliefScore
+};
+
+function getEuropeTerrainPenaltyScore(lat, lng)
+{
+	var penaltyScore = 0;
+
+	if (lat >= 43 && lat <= 47.5 && lng >= 6 && lng <= 15) {
+		penaltyScore += 0.18;
+	}
+	if (lat > 63 && lng >= 15 && lng <= 35) {
+		penaltyScore += ((lat - 63) / 8) * 0.18;
+	}
+
+	return clampNetworkUnit(penaltyScore);
+}
+
+function getEuropeTerrainReliefScore(lat, lng)
+{
+	var reliefScore = 0;
+
+	if (lat >= 47 && lat <= 54 && lng >= -2 && lng <= 20) {
+		reliefScore += 0.20;
+	}
+	if (lat >= 37 && lat <= 45 && lng >= -10 && lng <= 25) {
+		reliefScore += 0.08;
+	}
+
+	return clampNetworkUnit(reliefScore);
+}
+
+const EUROPE_ROAD_TILES = {
 	'34.5_32.5': { fast: 9, main: 26, mid: 41, local: 55 },
 	'34.5_33.0': { fast: 8, main: 25, mid: 40, local: 54 },
 	'35.0_23.5': { fast: 7, main: 20, mid: 33, local: 45 },
@@ -3497,18 +3585,23 @@ C.ROADS_TILES = {
 	'70.5_29.5': { fast: 4, main: 14, mid: 23, local: 32 }
 };
 
-function GetRoadTileKeyFromLatLng(lat, lng)
-{
-	var tileSizeDeg = C.ROADS_TILE_SIZE_DEG;
-	var tileEps = C.TILE_KEY_EPSILON;
-	var tileLatUnits = Math.floor((lat / tileSizeDeg) + tileEps);
-	var tileLngUnits = Math.floor((lng / tileSizeDeg) + tileEps);
-	var tileLat = tileLatUnits * tileSizeDeg;
-	var tileLng = tileLngUnits * tileSizeDeg;
-	return tileLat.toFixed(1) + '_' + tileLng.toFixed(1);
-}
+const EUROPE_NETWORK_TILES = Object.create(null);
 
-function GetRoadTileStats(tileKey)
-{
-	return C.ROADS_TILES[tileKey] || null;
-}
+Object.keys(EUROPE_ROAD_TILES).forEach(tileKey => {
+	var tileInfo = getNetworkTileInfoFromTileKey(tileKey);
+	if (!tileInfo) return;
+	EUROPE_NETWORK_TILES[tileKey] = buildNetworkTileRecord(
+		EUROPE_ROAD_TILES[tileKey],
+		buildTerrainDataForRegion(EUROPE_TERRAIN_CONFIG, tileInfo)
+	);
+});
+
+mergeNetworkTiles(EUROPE_NETWORK_TILES);
+
+registerNetworkTileSource(tileInfo => {
+	if (!isTileInfoInBounds(tileInfo, EUROPE_BOUNDS)) return null;
+	if (!isLandPoint(tileInfo.centerLat, tileInfo.centerLng)) return null;
+	var existingRecord = EUROPE_NETWORK_TILES[tileInfo.tileKey];
+	if (existingRecord) return existingRecord;
+	return buildNetworkTileRecord(null, buildTerrainDataForRegion(EUROPE_TERRAIN_CONFIG, tileInfo));
+});

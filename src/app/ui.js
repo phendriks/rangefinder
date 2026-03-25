@@ -1,255 +1,355 @@
+const ELS = {
+	calc: document.getElementById('calc'),
+	clear: document.getElementById('clr'),
+	distanceLabel: document.getElementById('ld'),
+	distancePanel: document.getElementById('dp'),
+	distanceToggle: document.getElementById('dtg'),
+	legend: document.getElementById('leg'),
+	location: document.getElementById('loc'),
+	locationWrap: document.getElementById('lw'),
+	maxDistanceInput: document.getElementById('mad'),
+	maxDistanceSlider: document.getElementById('mads'),
+	maxTimeInput: document.getElementById('mah'),
+	maxTimeSlider: document.getElementById('mas'),
+	minDistanceInput: document.getElementById('mid'),
+	minDistanceSlider: document.getElementById('mids'),
+	minTimeInput: document.getElementById('mih'),
+	minTimeSlider: document.getElementById('mis'),
+	modeNote: document.getElementById('sn'),
+	progressBar: document.getElementById('progress-bar'),
+	showGrid: document.getElementById('show-grid'),
+	statusArea: document.getElementById('status-area'),
+	statusMsg: document.getElementById('status-msg'),
+	suggestions: document.getElementById('sug'),
+	timeLabel: document.getElementById('lt'),
+	timePanel: document.getElementById('tp')
+};
 
-// Mode buttons
+const MODE_BUTTONS = Array.from(document.querySelectorAll('.mb'));
+const ACTIVE_MEASURE_LABEL_CLASS = 'measure-label-active';
+const MUTED_MEASURE_LABEL_CLASS = 'measure-label-muted';
 
-document.querySelectorAll('.mb').forEach(btn => {
-	btn.addEventListener('click', () => {
-		document.querySelectorAll('.mb').forEach(b => b.classList.remove('active'));
-		btn.classList.add('active');
-		activeModeKey = btn.dataset.mode;
-		document.getElementById('sn').textContent = C.MODE_NOTE[activeModeKey];
-		clearOverlay();
+function setMode(modeKey)
+{
+	MODE_BUTTONS.forEach(button => {
+		button.classList.toggle('active', button.dataset.mode === modeKey);
 	});
-});
-
-
-// Sliders (time)
-
-const mih = document.getElementById('mih'), mah = document.getElementById('mah');
-const mis = document.getElementById('mis'), mas = document.getElementById('mas');
-
-function sMin(v) { v = Math.max(C.UI_TIME_MIN_HOURS, Math.min(+mah.value - C.UI_TIME_STEP_HOURS, +v)); mih.value = mis.value = v; }
-function sMax(v) { v = Math.min(C.UI_TIME_MAX_HOURS, Math.max(+mih.value + C.UI_TIME_STEP_HOURS, +v)); mah.value = mas.value = v; }
-
-mih.addEventListener('change', e => sMin(e.target.value));
-mis.addEventListener('input',e => sMin(e.target.value));
-mah.addEventListener('change', e => sMax(e.target.value));
-mas.addEventListener('input',e => sMax(e.target.value));
-
-
-// Sliders (distance)
-
-const mid= document.getElementById('mid'),mad= document.getElementById('mad');
-const mids = document.getElementById('mids'), mads = document.getElementById('mads');
-
-function sdMin(v) { v = Math.max(C.UI_DIST_MIN_KM, Math.min(+mad.value - C.UI_DIST_STEP_KM, +v)); mid.value = mids.value = v; }
-function sdMax(v) { v = Math.min(C.UI_DIST_MAX_KM, Math.max(+mid.value + C.UI_DIST_STEP_KM, +v)); mad.value = mads.value = v; }
-
-mid.addEventListener('change',e => sdMin(e.target.value));
-mids.addEventListener('input',e => sdMin(e.target.value));
-mad.addEventListener('change',e => sdMax(e.target.value));
-mads.addEventListener('input',e => sdMax(e.target.value));
-
-
-// Time / distance toggle
-
-document.getElementById('dtg').addEventListener('change', function () {
-	useDist = this.checked;
-	document.getElementById('tp').style.display = useDist ? 'none' : 'flex';
-	document.getElementById('dp').style.display = useDist ? 'flex' : 'none';
-	document.getElementById('lt').style.cssText = useDist
-		? 'color:var(--mt)'
-		: 'font-weight:600;color:var(--tx)';
-	document.getElementById('ld').style.cssText = useDist
-		? 'font-weight:600;color:var(--tx)'
-		: 'color:var(--mt)';
+	activeModeKey = modeKey;
+	ELS.modeNote.textContent = C.MODE_NOTE[modeKey] || '';
 	clearOverlay();
-});
+}
 
-document.getElementById('tp').style.display = 'flex';
-document.getElementById('dp').style.display = 'none';
+function syncRangePair(nextValue, minValue, maxValue, inputEl, sliderEl)
+{
+	const safeValue = Math.max(minValue, Math.min(maxValue, +nextValue));
+	inputEl.value = safeValue;
+	sliderEl.value = safeValue;
+}
 
+function setTimeMin(nextValue)
+{
+	const maxAllowed = +ELS.maxTimeInput.value - C.UI_TIME_STEP_HOURS;
+	syncRangePair(nextValue, C.UI_TIME_MIN_HOURS, maxAllowed, ELS.minTimeInput, ELS.minTimeSlider);
+}
 
-// Visibility toggles
+function setTimeMax(nextValue)
+{
+	const minAllowed = +ELS.minTimeInput.value + C.UI_TIME_STEP_HOURS;
+	syncRangePair(nextValue, minAllowed, C.UI_TIME_MAX_HOURS, ELS.maxTimeInput, ELS.maxTimeSlider);
+}
 
-document.getElementById('show-grid').addEventListener('change', function () {
-	if (this.checked && (!gridMarkers || gridMarkers.length === 0) && Array.isArray(gridSourceData) && gridSourceData.length) {
-		renderGrid(gridSourceData);
-		return;
+function setDistanceMin(nextValue)
+{
+	const maxAllowed = +ELS.maxDistanceInput.value - C.UI_DIST_STEP_KM;
+	syncRangePair(nextValue, C.UI_DIST_MIN_KM, maxAllowed, ELS.minDistanceInput, ELS.minDistanceSlider);
+}
+
+function setDistanceMax(nextValue)
+{
+	const minAllowed = +ELS.minDistanceInput.value + C.UI_DIST_STEP_KM;
+	syncRangePair(nextValue, minAllowed, C.UI_DIST_MAX_KM, ELS.maxDistanceInput, ELS.maxDistanceSlider);
+}
+
+function setMeasureLabelState(activeEl, mutedEl)
+{
+	activeEl.classList.add(ACTIVE_MEASURE_LABEL_CLASS);
+	activeEl.classList.remove(MUTED_MEASURE_LABEL_CLASS);
+	mutedEl.classList.add(MUTED_MEASURE_LABEL_CLASS);
+	mutedEl.classList.remove(ACTIVE_MEASURE_LABEL_CLASS);
+}
+
+function updateMeasureMode()
+{
+	useDist = ELS.distanceToggle.checked;
+	ELS.timePanel.style.display = useDist ? 'none' : 'flex';
+	ELS.distancePanel.style.display = useDist ? 'flex' : 'none';
+
+	if (useDist) {
+		setMeasureLabelState(ELS.distanceLabel, ELS.timeLabel);
+	} else {
+		setMeasureLabelState(ELS.timeLabel, ELS.distanceLabel);
 	}
-	gridMarkers.forEach(m => this.checked ? map.addLayer(m) : map.removeLayer(m));
-	if (!this.checked) hidePointInspect();
-});
 
-
-// Geocoding
-
-const locEl = document.getElementById('loc');
-const sugEl = document.getElementById('sug');
-
-locEl.addEventListener('input', () => {
-	clearTimeout(searchTimer);
-	const q = locEl.value.trim();
-	if (q.length < C.GEOCODE_MIN_QUERY_LENGTH) { hideSug(); return; }
-	if (q === lastQuery) return;
-	searchTimer = setTimeout(() => { lastQuery = q; doSearch(q); }, C.GEOCODE_DEBOUNCE_MS);
-});
-
-locEl.addEventListener('keydown', e => { if (e.key === 'Escape') hideSug(); });
-document.addEventListener('click', e => { if (!e.target.closest('#lw')) hideSug(); });
-
-function hideSug() { sugEl.style.display = 'none'; sugEl.innerHTML = ''; }
-
-async function doSearch(q) {
-	try {
-		const url= `${C.NOMINATIM_URL}/search?format=json&q=${encodeURIComponent(q)}&limit=${C.GEOCODE_MAX_RESULTS}&addressdetails=1`;
-		const data = await fetch(url, {
-			cache: 'no-store',
-			headers: C.NOMINATIM_HEADERS
-		}).then(r => r.json());
-
-		if (locEl.value.trim() !== q) return;
-		renderSug(data);
-	} catch { hideSug(); }
+	clearOverlay();
 }
 
-function renderSug(results) {
-	sugEl.innerHTML = '';
-	if (!results.length) { hideSug(); return; }
-
-	results.slice(0, C.GEOCODE_MAX_RESULTS).forEach(r => {
-		const d = document.createElement('div');
-		d.className = 'si';
-		const parts = r.display_name.split(', ');
-		const main= esc(parts.slice(0, 2).join(', '));
-		const sub = parts.length > 2 ? esc(parts.slice(2).join(', ')) : '';
-		d.innerHTML = `<div class="sm">${main}</div>${sub ? `<div class="ss">${sub}</div>` : ''}`;
-
-		d.addEventListener('click', () => {
-			locEl.value = r.display_name; lastQuery = r.display_name; hideSug();
-			placePin(+r.lat, +r.lon);
-			map.setView([+r.lat, +r.lon], C.MAP_GEOCODE_ZOOM);
-			applyAddress(+r.lat, +r.lon);
-		});
-
-		sugEl.appendChild(d);
-	});
-
-	sugEl.style.display = 'block';
+function stopActiveWorker()
+{
+	if (!worker) return;
+	worker.terminate();
+	worker = null;
 }
 
-function esc(s) {
-	return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+function showSuggestions()
+{
+	ELS.suggestions.style.display = 'block';
 }
 
+function hideSuggestions()
+{
+	ELS.suggestions.style.display = 'none';
+	ELS.suggestions.innerHTML = '';
+}
 
-// Map click and reverse geocode
+function escapeHtml(value)
+{
+	return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
 
-map.on('click', async e => {
-	const { lat, lng } = e.latlng;
-	placePin(lat, lng);
-	locEl.value = `${lat.toFixed(5)}, ${lng.toFixed(5)}`; lastQuery = locEl.value;
-	hideSug();
+function setStatus(message, pct)
+{
+	ELS.statusMsg.textContent = message;
+	if (pct !== null) ELS.progressBar.style.width = pct + '%';
+}
 
-	try {
-		const url = `${C.NOMINATIM_URL}/reverse?format=json&lat=${lat}&lon=${lng}&zoom=${C.REVERSE_GEOCODE_ZOOM}&addressdetails=1`;
-		const d = await fetch(url, {
-			cache: 'no-store',
-			headers: C.NOMINATIM_HEADERS
-		}).then(r => r.json());
+function setCalcBusyState(isBusy)
+{
+	ELS.calc.disabled = isBusy;
+	ELS.statusArea.classList.toggle('vis', isBusy);
+	if (!isBusy) ELS.progressBar.style.width = '0%';
+}
 
-		if (!d?.lat) return;
-
-		const dist = turf.distance(turf.point([lng, lat]), turf.point([+d.lon, +d.lat]), { units: 'meters' });
-		if (dist <= C.REVERSE_GEOCODE_MAX_DISTANCE_M && d.display_name) {
-			locEl.value = d.display_name; lastQuery = d.display_name;
-		}
-
-		applyAddress(lat, lng);
-	} catch {}
-});
-
-function applyAddress(lat, lng) {
+function applyAddress(lat, lng)
+{
 	placePin(lat, lng);
 }
 
-
-// Pin
-
-function placePin(lat, lng) {
+function placePin(lat, lng)
+{
 	coords = { lat, lng };
 	if (pin) map.removeLayer(pin);
 	pin = L.marker([lat, lng]).addTo(map);
 	clearOverlay();
 }
 
+async function doSearch(query)
+{
+	try {
+		const url = `${C.NOMINATIM_URL}/search?format=json&q=${encodeURIComponent(query)}&limit=${C.GEOCODE_MAX_RESULTS}&addressdetails=1`;
+		const results = await fetch(url, {
+			cache: 'no-store',
+			headers: C.NOMINATIM_HEADERS
+		}).then(response => response.json());
 
-// Calculation: Travel Distance
+		if (ELS.location.value.trim() !== query) return;
+		renderSuggestions(results);
+	} catch {
+		hideSuggestions();
+	}
+}
 
-document.getElementById('calc').addEventListener('click', () => {
-	if (!coords) { alert('Please select a starting location first.'); return; }
-
-	if (worker) { worker.terminate(); worker = null; }
-
-	const speed = C.MODE_SPEED_KMH[activeModeKey];
-	const modeTau = C.MODE_TORTUOSITY[activeModeKey];
-	const terrTau = C.TERRAIN_TAU_DEFAULT;
-	const total = modeTau * terrTau;
-	const effSpd= speed / total;
-
-	let outerKm, innerKm, legOTxt, legITxt;
-
-	if (!useDist) {
-		const minH = +mih.value, maxH = +mah.value;
-		outerKm= effSpd * maxH;
-		innerKm= effSpd * minH;
-		legOTxt= `Outer: ~${fmt(outerKm)} km (${maxH} hr)`;
-		legITxt= `Inner: ~${fmt(innerKm)} km (${minH} hr)`;
-	} else {
-		const minD = +mid.value, maxD = +mad.value;
-		outerKm= maxD / total;
-		innerKm= minD / total;
-		legOTxt= `Outer: ~${fmt(outerKm)} km (${maxD} km road)`;
-		legITxt= `Inner: ~${fmt(innerKm)} km (${minD} km road)`;
+function renderSuggestions(results)
+{
+	ELS.suggestions.innerHTML = '';
+	if (!results.length) {
+		hideSuggestions();
+		return;
 	}
 
-	const meta = { effSpd, total, speed, modeTau, terrTau, outerKm, innerKm };
+	results.slice(0, C.GEOCODE_MAX_RESULTS).forEach(result => {
+		const suggestionEl = document.createElement('div');
+		suggestionEl.className = 'si';
+		const parts = result.display_name.split(', ');
+		const mainLabel = escapeHtml(parts.slice(0, 2).join(', '));
+		const subLabel = parts.length > 2 ? escapeHtml(parts.slice(2).join(', ')) : '';
+		suggestionEl.innerHTML = `<div class="sm">${mainLabel}</div>${subLabel ? `<div class="ss">${subLabel}</div>` : ''}`;
+		suggestionEl.addEventListener('click', () => {
+			const lat = +result.lat;
+			const lng = +result.lon;
+			ELS.location.value = result.display_name;
+			lastQuery = result.display_name;
+			hideSuggestions();
+			placePin(lat, lng);
+			map.setView([lat, lng], C.MAP_GEOCODE_ZOOM);
+			applyAddress(lat, lng);
+		});
+		ELS.suggestions.appendChild(suggestionEl);
+	});
 
+	showSuggestions();
+}
+
+async function handleMapClick(evt)
+{
+	const { lat, lng } = evt.latlng;
+	placePin(lat, lng);
+	ELS.location.value = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+	lastQuery = ELS.location.value;
+	hideSuggestions();
+
+	try {
+		const url = `${C.NOMINATIM_URL}/reverse?format=json&lat=${lat}&lon=${lng}&zoom=${C.REVERSE_GEOCODE_ZOOM}&addressdetails=1`;
+		const result = await fetch(url, {
+			cache: 'no-store',
+			headers: C.NOMINATIM_HEADERS
+		}).then(response => response.json());
+		if (!result?.lat) return;
+
+		const reverseDistanceM = turf.distance(
+			turf.point([lng, lat]),
+			turf.point([+result.lon, +result.lat]),
+			{ units: 'meters' }
+		);
+		if (reverseDistanceM <= C.REVERSE_GEOCODE_MAX_DISTANCE_M && result.display_name) {
+			ELS.location.value = result.display_name;
+			lastQuery = result.display_name;
+		}
+
+		applyAddress(lat, lng);
+	} catch {}
+}
+
+function getRangeRequest()
+{
+	const baseSpeedKmh = C.MODE_SPEED_KMH[activeModeKey];
+	const modeTau = C.MODE_TORTUOSITY[activeModeKey];
+	const terrainTau = C.TERRAIN_TAU_DEFAULT;
+	const totalTau = modeTau * terrainTau;
+	const effectiveSpeedKmh = baseSpeedKmh / totalTau;
+
+	if (!useDist) {
+		const minHours = +ELS.minTimeInput.value;
+		const maxHours = +ELS.maxTimeInput.value;
+		return {
+			outerKm: effectiveSpeedKmh * maxHours,
+			innerKm: effectiveSpeedKmh * minHours,
+			outerLegendLabel: `Outer: ~${fmt(effectiveSpeedKmh * maxHours)} km (${maxHours} hr)`,
+			innerLegendLabel: `Inner: ~${fmt(effectiveSpeedKmh * minHours)} km (${minHours} hr)`
+		};
+	}
+
+	const minDistanceKm = +ELS.minDistanceInput.value;
+	const maxDistanceKm = +ELS.maxDistanceInput.value;
+	return {
+		outerKm: maxDistanceKm / totalTau,
+		innerKm: minDistanceKm / totalTau,
+		outerLegendLabel: `Outer: ~${fmt(maxDistanceKm / totalTau)} km (${maxDistanceKm} km road)`,
+		innerLegendLabel: `Inner: ~${fmt(minDistanceKm / totalTau)} km (${minDistanceKm} km road)`
+	};
+}
+
+function handleWorkerMessage(evt, outerLegendLabel, innerLegendLabel)
+{
+	const msg = evt.data;
+	switch (msg.type) {
+		case 'status':
+			setStatus(msg.msg, null);
+			break;
+		case 'progress':
+			setStatus(`Walking vectors... ${msg.pct}%`, msg.pct);
+			break;
+		case 'grid':
+			renderGrid(msg.pts);
+			break;
+		case 'done':
+			stopActiveWorker();
+			setCalcBusyState(false);
+			renderResults(msg, outerLegendLabel, innerLegendLabel);
+			break;
+		case 'error':
+			stopActiveWorker();
+			setCalcBusyState(false);
+			alert(`Error: ${msg.msg}`);
+			break;
+	}
+}
+
+function startCalculation()
+{
+	if (!coords) {
+		alert('Please select a starting location first.');
+		return;
+	}
+
+	stopActiveWorker();
+
+	const rangeRequest = getRangeRequest();
 	clearOverlay(false);
-
-	const calcBtn = document.getElementById('calc');
-	const statusArea = document.getElementById('status-area');
-
-	calcBtn.disabled = true;
-	statusArea.classList.add('vis');
+	setCalcBusyState(true);
 	setStatus('Initialising...', 0);
 
 	worker = new Worker('./src/worker/rangeWorker.js');
-
-	function finishCalc() {
-		worker = null;
-		statusArea.classList.remove('vis');
-		calcBtn.disabled = false;
-	}
-
-	worker.onmessage = function (evt) {
-		const msg = evt.data;
-		switch (msg.type) {
-			case 'status': setStatus(msg.msg, null); break;
-			case 'progress': setStatus(`Walking vectors... ${msg.pct}%`, msg.pct); break;
-			case 'grid': renderGrid(msg.pts); break;
-			case 'done':
-				finishCalc();
-				renderResults(msg, meta, legOTxt, legITxt);
-				break;
-			case 'error':
-				finishCalc();
-				alert(`Error: ${msg.msg}`);
-				break;
-		}
+	worker.onmessage = evt => handleWorkerMessage(evt, rangeRequest.outerLegendLabel, rangeRequest.innerLegendLabel);
+	worker.onerror = evt => {
+		stopActiveWorker();
+		setCalcBusyState(false);
+		alert(`Worker error: ${evt.message}`);
 	};
-
-	worker.onerror = function (e) {
-		finishCalc();
-		alert(`Worker error: ${e.message}`);
-	};
-
-	worker.postMessage({ clat: coords.lat, clng: coords.lng, outerKm, innerKm, debugGrid: document.getElementById('show-grid').checked });
-});
-
-function setStatus(msg, pct) {
-	document.getElementById('status-msg').textContent = msg;
-	if (pct !== null) document.getElementById('progress-bar').style.width = pct + '%';
+	worker.postMessage({
+		clat: coords.lat,
+		clng: coords.lng,
+		outerKm: rangeRequest.outerKm,
+		innerKm: rangeRequest.innerKm
+	});
 }
 
+MODE_BUTTONS.forEach(button => {
+	button.addEventListener('click', () => setMode(button.dataset.mode));
+});
+setMode(activeModeKey);
 
-// Render: land grid
+ELS.minTimeInput.addEventListener('change', evt => setTimeMin(evt.target.value));
+ELS.minTimeSlider.addEventListener('input', evt => setTimeMin(evt.target.value));
+ELS.maxTimeInput.addEventListener('change', evt => setTimeMax(evt.target.value));
+ELS.maxTimeSlider.addEventListener('input', evt => setTimeMax(evt.target.value));
+ELS.minDistanceInput.addEventListener('change', evt => setDistanceMin(evt.target.value));
+ELS.minDistanceSlider.addEventListener('input', evt => setDistanceMin(evt.target.value));
+ELS.maxDistanceInput.addEventListener('change', evt => setDistanceMax(evt.target.value));
+ELS.maxDistanceSlider.addEventListener('input', evt => setDistanceMax(evt.target.value));
+
+ELS.distanceToggle.addEventListener('change', updateMeasureMode);
+updateMeasureMode();
+
+ELS.showGrid.addEventListener('change', function () {
+	if (this.checked && (!gridMarkers || !gridMarkers.length) && Array.isArray(gridSourceData) && gridSourceData.length) {
+		renderGrid(gridSourceData);
+		return;
+	}
+	gridMarkers.forEach(marker => this.checked ? map.addLayer(marker) : map.removeLayer(marker));
+	if (!this.checked) hidePointInspect();
+});
+
+ELS.location.addEventListener('input', () => {
+	clearTimeout(searchTimer);
+	const query = ELS.location.value.trim();
+	if (query.length < C.GEOCODE_MIN_QUERY_LENGTH) {
+		hideSuggestions();
+		return;
+	}
+	if (query === lastQuery) return;
+	searchTimer = setTimeout(() => {
+		lastQuery = query;
+		doSearch(query);
+	}, C.GEOCODE_DEBOUNCE_MS);
+});
+
+ELS.location.addEventListener('keydown', evt => {
+	if (evt.key === 'Escape') hideSuggestions();
+});
+
+document.addEventListener('click', evt => {
+	if (!evt.target.closest('#lw')) hideSuggestions();
+});
+
+map.on('click', handleMapClick);
+ELS.calc.addEventListener('click', startCalculation);

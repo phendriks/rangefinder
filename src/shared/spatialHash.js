@@ -1,13 +1,18 @@
 // spatialHash.js
 // Shared deterministic hashing and spatial indexing helpers.
 
-function Hash01(indexValue, salt)
+const HASH_SEED = 1;
+const HASH_MULTIPLIER = 12.9898;
+const HASH_SPREAD = 43758.5453;
+const HASH_SALT_STEP = 1013;
+
+function hash01(indexValue, salt)
 {
-	var x = Math.sin((indexValue + (salt * C.DELAUNAY_JITTER_SALT_STEP) + C.DELAUNAY_JITTER_SEED) * C.DELAUNAY_JITTER_HASH_A) * C.DELAUNAY_JITTER_HASH_B;
+	var x = Math.sin((indexValue + (salt * HASH_SALT_STEP) + HASH_SEED) * HASH_MULTIPLIER) * HASH_SPREAD;
 	return x - Math.floor(x);
 }
 
-function BuildSpatialHash(pointsXy, cellSize)
+function buildSpatialHash(pointsXy, cellSize)
 {
 	var map = new Map();
 	for (var i = 0; i < pointsXy.length; i++) {
@@ -27,7 +32,7 @@ function BuildSpatialHash(pointsXy, cellSize)
 	return map;
 }
 
-function FindNearestIndex(spatialHash, pointsXy, cellSize, x, y)
+function findNearestIndex(spatialHash, pointsXy, cellSize, x, y)
 {
 	var cx = Math.floor(x / cellSize);
 	var cy = Math.floor(y / cellSize);

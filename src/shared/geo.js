@@ -1,6 +1,5 @@
 // geo.js
 // Shared geographic helpers.
-//TODO: store functions in a central helper database
 
 function haversineKm(a, b) {
 	var lat1 = a[0] * Math.PI / 180;

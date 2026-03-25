@@ -20,7 +20,7 @@ Notes:
 
 
 To generate a global set from Natural Earth and write it into
-src/data/countries-natural-earth.js:
+src/data/countriesNaturalEarth.js:
 
 	python3 scripts/build-country-polygons.py
 
@@ -34,3 +34,11 @@ To use a higher detail dataset:
 - `src/config/travel-constants.js`: routing, roads, crossings, and `speedClass` tuning
 - `src/config/shape-constants.js`: grid, mesh, and contour generation
 - `src/config/ui-constants.js`: map defaults, colours, and browser/UI behaviour
+
+## Road tile sources
+
+- `src/data/network-tiles.js`: shared network tile helpers and synthetic region registration
+- `src/data/europe-tiles.js`: Europe road tiles plus synthesized terrain severity
+- `src/data/north-america-tiles.js`: synthetic North America road and terrain tiles
+- `src/data/north-africa-tiles.js`: synthetic North Africa road and terrain tiles
+- `src/data/middle-east-tiles.js`: synthetic Middle East road and terrain tiles

@@ -1,4 +1,4 @@
-// meshBuild.js
+// mesh.js
 // Mesh and site generation helpers for range-worker.
 
 function buildSitesMesh(clat, clng, maxKm) {
@@ -13,7 +13,7 @@ function buildSitesMesh(clat, clng, maxKm) {
 	const minLng = clng - lngDelta;
 	const maxLng = clng + lngDelta;
 
-	let N = ClampNumber(Math.round(maxKm / C.GRID_SIZE_DIVISOR), C.GRID_SIZE_MIN, C.GRID_SIZE_MAX);
+	let N = getGridSize(maxKm);
 
 	const stepLat = (maxLat - minLat) / N;
 	const stepLng = (maxLng - minLng) / N;
@@ -36,6 +36,8 @@ function buildSitesMesh(clat, clng, maxKm) {
 	const landTypes = cellTypes;
 	const speedClasses = new Array(sites.length).fill(null);
 	const roadBands = new Array(sites.length).fill(null);
+	const terrainSeverities = new Array(sites.length).fill(null);
+	const terrainScores = new Array(sites.length).fill(null);
 
 	const mesh = {
 		pts,
@@ -43,6 +45,8 @@ function buildSitesMesh(clat, clng, maxKm) {
 		landTypes,
 		speedClasses,
 		roadBands,
+		terrainSeverities,
+		terrainScores,
 		N,
 		minLat,
 		maxLat,
@@ -56,8 +60,8 @@ function buildSitesMesh(clat, clng, maxKm) {
 		clng
 	};
 
-	if (typeof AssignRoadEnums === 'function') {
-		AssignRoadEnums(mesh);
+	if (typeof assignTileEnums === 'function') {
+		assignTileEnums(mesh);
 	}
 
 	let delaunayMesh = buildDelaunayMesh(pts, clat, clng, 0, stepKmHint);
@@ -99,8 +103,8 @@ function buildDelaunayMesh(pts, clat, clng, N, stepKmHint) {
 		const y0 = (lat - clat) * C.KM_PER_DEG_LAT;
 		let x = x0;
 		let y = y0;
-		x += (Hash01(i, 0) - 0.5) * jitterAmpKm;
-		y += (Hash01(i, 1) - 0.5) * jitterAmpKm;
+		x += (hash01(i, 0) - 0.5) * jitterAmpKm;
+		y += (hash01(i, 1) - 0.5) * jitterAmpKm;
 		xy[i] = [x, y];
 		xyBase[i] = [x0, y0];
 	}
@@ -146,17 +150,17 @@ function buildJitteredSites(minLat, maxLat, minLng, maxLng, clat, clng, N, stepK
 	const side = N + 1;
 	const stepLat = (maxLat - minLat) / side;
 	const stepLng = (maxLng - minLng) / side;
-	const jitter = ClampNumber(C.LLOYD_JITTER_FACTOR, 0, 1);
+	const jitter = clampNumber(C.LLOYD_JITTER_FACTOR, 0, 1);
 	const margin = (1 - jitter) * 0.5;
 
 	for (let i = 0; i < side; i++) {
 		for (let j = 0; j < side; j++) {
 			const cellMinLat = minLat + i * stepLat;
 			const cellMinLng = minLng + j * stepLng;
-			const h1 = Hash01(i * side + j, 11);
-			const h2 = Hash01(i * side + j, 17);
-			const lat = ClampNumber(cellMinLat + (margin + h1 * jitter) * stepLat, minLat, maxLat);
-			const lng = ClampNumber(cellMinLng + (margin + h2 * jitter) * stepLng, minLng, maxLng);
+			const h1 = hash01(i * side + j, 11);
+			const h2 = hash01(i * side + j, 17);
+			const lat = clampNumber(cellMinLat + (margin + h1 * jitter) * stepLat, minLat, maxLat);
+			const lng = clampNumber(cellMinLng + (margin + h2 * jitter) * stepLng, minLng, maxLng);
 			sites.push({ lat, lng });
 		}
 	}
@@ -190,14 +194,14 @@ function lloydRelax(sites, minLat, maxLat, minLng, maxLng, clat, clng, N, stepKm
 	const cellSize = stepKmHint * C.LLOYD_HASH_CELL_FACTOR;
 
 	for (let iter = 0; iter < C.LLOYD_ITERATIONS; iter++) {
-		const hash = BuildSpatialHash(xy, cellSize);
+		const hash = buildSpatialHash(xy, cellSize);
 		const sumX = new Float64Array(xy.length);
 		const sumY = new Float64Array(xy.length);
 		const count = new Uint16Array(xy.length);
 
 		for (let s = 0; s < samplePts.length; s++) {
 			const sp = samplePts[s];
-			const idx = FindNearestIndex(hash, xy, cellSize, sp[0], sp[1]);
+			const idx = findNearestIndex(hash, xy, cellSize, sp[0], sp[1]);
 			if (idx < 0) continue;
 			sumX[idx] += sp[0];
 			sumY[idx] += sp[1];
@@ -210,8 +214,8 @@ function lloydRelax(sites, minLat, maxLat, minLng, maxLng, clat, clng, N, stepKm
 			const py = xy[i][1];
 			const cx = sumX[i] / count[i];
 			const cy = sumY[i] / count[i];
-			xy[i][0] = ClampNumber(px + (cx - px) * C.LLOYD_ALPHA, bounds.minX, bounds.maxX);
-			xy[i][1] = ClampNumber(py + (cy - py) * C.LLOYD_ALPHA, bounds.minY, bounds.maxY);
+			xy[i][0] = clampNumber(px + (cx - px) * C.LLOYD_ALPHA, bounds.minX, bounds.maxX);
+			xy[i][1] = clampNumber(py + (cy - py) * C.LLOYD_ALPHA, bounds.minY, bounds.maxY);
 		}
 	}
 
@@ -255,7 +259,7 @@ function sampleCostsToRaster(mesh, costs, raster) {
 	const sitesXy = mesh.xy;
 
 	const cellSize = Math.max(1, mesh.stepKmHint) * C.RASTER_HASH_CELL_FACTOR;
-	const hash = BuildSpatialHash(sitesXy, cellSize);
+	const hash = buildSpatialHash(sitesXy, cellSize);
 	const out = new Array(raster.pts.length).fill(Infinity);
 
 	for (let i = 0; i < raster.pts.length; i++) {
@@ -263,7 +267,7 @@ function sampleCostsToRaster(mesh, costs, raster) {
 		const lng = raster.pts[i][1];
 		const x = (lng - clng) * C.KM_PER_DEG_LAT * cosLat;
 		const y = (lat - clat) * C.KM_PER_DEG_LAT;
-		const idx = FindNearestIndex(hash, sitesXy, cellSize, x, y);
+		const idx = findNearestIndex(hash, sitesXy, cellSize, x, y);
 		if (idx < 0) continue;
 		out[i] = costs[idx];
 	}
@@ -335,6 +339,6 @@ function buildMeshOriginHash(mesh) {
 	const cellSize = Math.max(1, mesh.stepKmHint) * C.RASTER_HASH_CELL_FACTOR;
 	return {
 		cellSize,
-		hash: BuildSpatialHash(mesh.xy, cellSize)
+		hash: buildSpatialHash(mesh.xy, cellSize)
 	};
 }
