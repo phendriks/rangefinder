@@ -197,7 +197,7 @@ const MINI_HIDDEN_CLASS = 'mini-hidden';
 		if (!isMobileViewport()) sidebar.classList.remove('sheet-collapsed');
 		updateSheetAria();
 		updateMiniBarVisibility();
-		syncMiniBarFromSidebar();
+		if (document.activeElement !== miniMin && document.activeElement !== miniMax) syncMiniBarFromSidebar();
 	});
 
 	if (typeof map !== 'undefined' && map && map.on) {
