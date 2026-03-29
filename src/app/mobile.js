@@ -138,14 +138,14 @@ const MINI_HIDDEN_CLASS = 'mini-hidden';
 		const useDistance = !!(distanceToggle && distanceToggle.checked);
 		if (useDistance) {
 			miniUnit.textContent = 'km';
-			miniMin.value = getInputValue('mid');
-			miniMax.value = getInputValue('mad');
+			if (document.activeElement !== miniMin) miniMin.value = getInputValue('mid');
+			if (document.activeElement !== miniMax) miniMax.value = getInputValue('mad');
 			miniMin.step = getInputValue('mid') ? $('mid').step : '10';
 			miniMax.step = getInputValue('mad') ? $('mad').step : '10';
 		} else {
 			miniUnit.textContent = 'hr';
-			miniMin.value = getInputValue('mih');
-			miniMax.value = getInputValue('mah');
+			if (document.activeElement !== miniMin) miniMin.value = getInputValue('mih');
+			if (document.activeElement !== miniMax) miniMax.value = getInputValue('mah');
 			miniMin.step = getInputValue('mih') ? $('mih').step : '0.5';
 			miniMax.step = getInputValue('mah') ? $('mah').step : '0.5';
 		}
@@ -197,7 +197,7 @@ const MINI_HIDDEN_CLASS = 'mini-hidden';
 		if (!isMobileViewport()) sidebar.classList.remove('sheet-collapsed');
 		updateSheetAria();
 		updateMiniBarVisibility();
-		if (document.activeElement !== miniMin && document.activeElement !== miniMax) syncMiniBarFromSidebar();
+		syncMiniBarFromSidebar();
 	});
 
 	if (typeof map !== 'undefined' && map && map.on) {
