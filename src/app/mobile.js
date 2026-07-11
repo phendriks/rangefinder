@@ -163,6 +163,10 @@ const MINI_HIDDEN_CLASS = 'mini-hidden';
 	{
 		const distanceToggle = $('dtg');
 		const useDistance = !!(distanceToggle && distanceToggle.checked);
+		
+		const minValue = miniMin.value;
+        const maxValue = miniMax.value;
+
 		if (useDistance) {
 			setUnderlyingValue('mid', miniMin.value);
 			setUnderlyingValue('mad', miniMax.value);
