@@ -65,7 +65,7 @@ self.onmessage = async event => {
 		self.postMessage({ type: 'status', msg: 'Extracting geometry...' });
 		const outer = computeIsoPolygonSites(mesh, costs, outerKm);
 		const inner = innerKm > 0 ? computeIsoPolygonSites(mesh, costs, innerKm) : null;
-		const deltaKm = outerKm - innerKm;
+		const deltaKm = (outerKm + innerKm) / 2;
 		const delta = deltaKm > 0
 			? computeIsoPolygonSites(mesh, costs, deltaKm)
 			: null;
