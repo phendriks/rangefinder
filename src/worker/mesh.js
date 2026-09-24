@@ -1,7 +1,7 @@
 // mesh.js
 // Mesh and site generation helpers for range-worker.
 
-function buildSitesMesh(clat, clng, maxKm) {
+function buildSitesMesh(clat, clng, maxKm, vectorRoadData) {
 	const marginKm = maxKm * C.GRID_MARGIN_FACTOR;
 	const rKm = maxKm + marginKm;
 
@@ -26,18 +26,26 @@ function buildSitesMesh(clat, clng, maxKm) {
 
 	let sites = buildJitteredSites(minLat, maxLat, minLng, maxLng, clat, clng, N, stepKmHint);
 	sites = lloydRelax(sites, minLat, maxLat, minLng, maxLng, clat, clng, N, stepKmHint);
+	const backgroundSiteCount = sites.length;
+	const roadNodes = vectorRoadData && Array.isArray(vectorRoadData.nodes) ? vectorRoadData.nodes : [];
 
-	const pts = new Array(sites.length);
-	const cellTypes = new Array(sites.length);
+	const pts = new Array(sites.length + roadNodes.length);
+	const cellTypes = new Array(pts.length);
 	for (let i = 0; i < sites.length; i++) {
 		pts[i] = [sites[i].lat, sites[i].lng];
 		cellTypes[i] = classifyCell(sites[i].lat, sites[i].lng);
 	}
+	for (let i = 0; i < roadNodes.length; i++) {
+		const pointIndex = backgroundSiteCount + i;
+		pts[pointIndex] = [roadNodes[i][0], roadNodes[i][1]];
+		const classified = classifyCell(roadNodes[i][0], roadNodes[i][1]);
+		cellTypes[pointIndex] = roadNodes[i][2] && classified === C.CELL_WATER ? C.CELL_CROSSING : classified;
+	}
 	const landTypes = cellTypes;
-	const speedClasses = new Array(sites.length).fill(null);
-	const roadBands = new Array(sites.length).fill(null);
-	const terrainSeverities = new Array(sites.length).fill(null);
-	const terrainScores = new Array(sites.length).fill(null);
+	const speedClasses = new Array(pts.length).fill(null);
+	const roadBands = new Array(pts.length).fill(null);
+	const terrainSeverities = new Array(pts.length).fill(null);
+	const terrainScores = new Array(pts.length).fill(null);
 
 	const mesh = {
 		pts,
@@ -57,7 +65,9 @@ function buildSitesMesh(clat, clng, maxKm) {
 		xy: null,
 		stepKmHint,
 		clat,
-		clng
+		clng,
+		backgroundSiteCount,
+		vectorRoadEdgeCosts: null
 	};
 
 	if (typeof assignTileEnums === 'function') {
@@ -66,8 +76,10 @@ function buildSitesMesh(clat, clng, maxKm) {
 
 	let delaunayMesh = buildDelaunayMesh(pts, clat, clng, 0, stepKmHint);
 	if (!delaunayMesh) {
+		const gridNeighbors = buildGridNeighbors(N);
+		while (gridNeighbors.length < pts.length) gridNeighbors.push([]);
 		delaunayMesh = {
-			neighbors: buildGridNeighbors(N),
+			neighbors: gridNeighbors,
 			triangles: null,
 			xy: null
 		};
@@ -76,9 +88,33 @@ function buildSitesMesh(clat, clng, maxKm) {
 	mesh.neighbors = delaunayMesh.neighbors;
 	mesh.triangles = delaunayMesh.triangles;
 	mesh.xy = delaunayMesh.xy;
+	mesh.vectorRoadEdgeCosts = addExplicitVectorRoadEdges(mesh, vectorRoadData);
 	mesh.edgeCosts = buildEdgeCosts(mesh);
 	mesh.originHash = buildMeshOriginHash(mesh);
 	return mesh;
+}
+
+function addExplicitVectorRoadEdges(mesh, vectorRoadData) {
+	if (!vectorRoadData || !Array.isArray(vectorRoadData.edges)) return null;
+	const overrides = new Map();
+	const offset = mesh.backgroundSiteCount;
+	for (let edgeIndex = 0; edgeIndex < vectorRoadData.edges.length; edgeIndex++) {
+		const edge = vectorRoadData.edges[edgeIndex];
+		if (!Array.isArray(edge) || edge.length < 3) continue;
+		const a = offset + Number(edge[0]);
+		const b = offset + Number(edge[1]);
+		const speedKmh = Number(edge[2]);
+		if (!Number.isInteger(a) || !Number.isInteger(b) || a === b || a < offset || b < offset) continue;
+		if (a >= mesh.pts.length || b >= mesh.pts.length || !Number.isFinite(speedKmh) || speedKmh <= 0) continue;
+		if (mesh.neighbors[a].indexOf(b) < 0) mesh.neighbors[a].push(b);
+		if (mesh.neighbors[b].indexOf(a) < 0) mesh.neighbors[b].push(a);
+		const distanceKm = haversineKm(mesh.pts[a], mesh.pts[b]);
+		const cost = distanceKm * (C.MODE_SPEED_KMH.drive / speedKmh);
+		const key = a < b ? a + ',' + b : b + ',' + a;
+		const existing = overrides.get(key);
+		if (existing === undefined || cost < existing) overrides.set(key, cost);
+	}
+	return overrides.size ? overrides : null;
 }
 function buildDelaunayMesh(pts, clat, clng, N, stepKmHint) {
 	if (typeof Delaunator === 'undefined') return null;
@@ -300,6 +336,15 @@ function buildEdgeCosts(mesh) {
 
 		for (let k = 0; k < nbs.length; k++) {
 			const nIdx = nbs[k];
+			let vectorRoadCost;
+			if (mesh.vectorRoadEdgeCosts) {
+				const edgeKey = i < nIdx ? i + ',' + nIdx : nIdx + ',' + i;
+				vectorRoadCost = mesh.vectorRoadEdgeCosts.get(edgeKey);
+			}
+			if (vectorRoadCost !== undefined) {
+				row[k] = vectorRoadCost;
+				continue;
+			}
 			const cellType = cellTypes[nIdx];
 			const dx = xy[nIdx][0] - xy[i][0];
 			const dy = xy[nIdx][1] - xy[i][1];

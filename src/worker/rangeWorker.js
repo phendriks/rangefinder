@@ -24,6 +24,7 @@ importScripts('../data/middle-east-tiles.js');
 importScripts('networkTiles.js');
 importScripts('land.js');
 importScripts('grid.js');
+importScripts('vectorRoadTiles.js');
 importScripts('mesh.js');
 importScripts('contour.js');
 
@@ -35,9 +36,11 @@ self.onmessage = async event => {
 		if (!Number.isFinite(clat) || !Number.isFinite(clng)) throw new Error('Invalid center coordinate.');
 
 		await ensureLandLoaded();
+		self.postMessage({ type: 'status', msg: 'Loading road network...' });
+		const vectorRoadData = await loadVectorRoadData(clat, clng, outerKm);
 
 		self.postMessage({ type: 'status', msg: 'Building mesh...' });
-		const mesh = buildSitesMesh(clat, clng, outerKm);
+		const mesh = buildSitesMesh(clat, clng, outerKm, vectorRoadData);
 
 		// Always send grid point data so the UI can enable Inspect grid after a calculation.
 		// Marker rendering stays lazy on the main thread, so the expensive part only happens

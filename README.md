@@ -42,3 +42,17 @@ To use a higher detail dataset:
 - `src/data/north-america-tiles.js`: synthetic North America road and terrain tiles
 - `src/data/north-africa-tiles.js`: synthetic North Africa road and terrain tiles
 - `src/data/middle-east-tiles.js`: synthetic Middle East road and terrain tiles
+
+## Live fast-road geometry
+
+Calculations optionally load a bounded set of OpenFreeMap vector tiles and extract
+motorways, trunks, their ramps, and primary expressways. These lines become explicit
+mesh edges while the existing synthetic road/terrain tiles remain the fallback.
+
+The worker selects zoom 4-8 adaptively, requests no more than 200 tiles per
+calculation, caches tile promises, and falls back without failing when metadata,
+decoder modules, or tiles are unavailable. Set `C.USE_VECTOR_ROADS = false` in
+`src/config/travel-constants.js` to disable live road loading.
+
+Road data uses the OpenMapTiles schema and OpenStreetMap data. No routing API is
+called; Dijkstra and contour generation remain local.
