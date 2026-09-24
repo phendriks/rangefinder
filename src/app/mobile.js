@@ -192,9 +192,15 @@ const MINI_HIDDEN_CLASS = 'mini-hidden';
 		setSheetCollapsed(false);
 	}
 
-	sheetTop.addEventListener('click', function () {
+	sheetTop.addEventListener('click', function (e) {
+		e.stopPropagation();
 		if (!isMobileViewport()) return;
 		setSheetCollapsed(!isSheetCollapsed());
+	});
+	
+	miniExpand.addEventListener('click', function (e) {
+		e.stopPropagation();
+		openSheet();
 	});
 
 	window.addEventListener('resize', function () {
@@ -205,9 +211,13 @@ const MINI_HIDDEN_CLASS = 'mini-hidden';
 	});
 
 	if (typeof map !== 'undefined' && map && map.on) {
-		map.on('click mousedown touchstart', function () {
-			if (isMobileViewport() && !isSheetCollapsed()) setSheetCollapsed(true);
-		});
+		map.on('click', function (e) {
+			if (!isMobileViewport() || isSheetCollapsed()) return;
+
+			const target = e.originalEvent?.target;
+			if (target?.closest('#sidebar') || target?.closest('#mini-bar')) return;
+	setSheetCollapsed(true);
+});
 	}
 
 	if (hasMiniBar()) {
