@@ -65,7 +65,11 @@ self.onmessage = async event => {
 		self.postMessage({ type: 'status', msg: 'Extracting geometry...' });
 		const outer = computeIsoPolygonSites(mesh, costs, outerKm);
 		const inner = innerKm > 0 ? computeIsoPolygonSites(mesh, costs, innerKm) : null;
-
+		const deltaKm = outerKm - innerKm;
+		const delta = deltaKm > 0
+			? computeIsoPolygonSites(mesh, costs, deltaKm)
+			: null;
+		
 		if (!outer || !outer.ring || outer.ring.length < 4) {
 			self.postMessage({
 				type: 'error',
@@ -83,7 +87,8 @@ self.onmessage = async event => {
 			outerRing: outer.ring,
 			innerRing: inner?.ring || null,
 			outerGeo,
-			innerGeo
+			innerGeo,
+			deltaGeo: delta?.geo || null
 		});
 	} catch (err) {
 		self.postMessage({ type: 'error', msg: err?.message ? String(err.message) : 'Unknown worker error' });
