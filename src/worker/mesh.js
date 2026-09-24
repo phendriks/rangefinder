@@ -1,7 +1,7 @@
 // mesh.js
 // Mesh and site generation helpers for range-worker.
 
-function buildSitesMesh(clat, clng, maxKm, vectorRoadData) {
+function buildSitesMesh(clat, clng, maxKm, vectorRoadData, modeKey) {
 	const marginKm = maxKm * C.GRID_MARGIN_FACTOR;
 	const rKm = maxKm + marginKm;
 
@@ -76,6 +76,7 @@ function buildSitesMesh(clat, clng, maxKm, vectorRoadData) {
 		stepKmHint,
 		clat,
 		clng,
+		modeKey: modeKey === 'cycle' ? 'cycle' : 'drive',
 		backgroundSiteCount,
 		haloSiteCount: haloSites.length,
 		vectorRoadEdgeCosts: null
@@ -187,7 +188,8 @@ function addExplicitVectorRoadEdges(mesh, vectorRoadData) {
 		if (mesh.neighbors[a].indexOf(b) < 0) mesh.neighbors[a].push(b);
 		if (mesh.neighbors[b].indexOf(a) < 0) mesh.neighbors[b].push(a);
 		const distanceKm = haversineKm(mesh.pts[a], mesh.pts[b]);
-		const cost = distanceKm * (C.MODE_SPEED_KMH.drive / speedKmh);
+		const modeSpeedKmh = Number(C.MODE_SPEED_KMH[mesh.modeKey]) || C.MODE_SPEED_KMH.drive;
+		const cost = distanceKm * (modeSpeedKmh / speedKmh);
 		const key = a < b ? a + ',' + b : b + ',' + a;
 		const existing = overrides.get(key);
 		if (existing === undefined || cost < existing) overrides.set(key, cost);

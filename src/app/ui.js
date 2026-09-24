@@ -299,7 +299,8 @@ function startCalculation()
 		clat: coords.lat,
 		clng: coords.lng,
 		outerKm: rangeRequest.outerKm,
-		innerKm: rangeRequest.innerKm
+		innerKm: rangeRequest.innerKm,
+		modeKey: activeModeKey
 	});
 }
 

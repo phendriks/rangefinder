@@ -46,10 +46,13 @@ function enumerateVectorRoadTiles(bounds, zoom)
 	return tiles;
 }
 
-function selectVectorRoadTiles(bounds)
+function selectVectorRoadTiles(bounds, modeKey)
 {
 	var maxTiles = Math.max(1, Number(C.VECTOR_ROAD_MAX_TILES) || 200);
-	for (var zoom = C.VECTOR_ROAD_MAX_ZOOM; zoom >= C.VECTOR_ROAD_MIN_ZOOM; zoom--) {
+	var maxZoom = modeKey === 'cycle'
+		? Math.max(C.VECTOR_ROAD_MAX_ZOOM, Number(C.VECTOR_ROAD_CYCLE_MAX_ZOOM) || C.VECTOR_ROAD_MAX_ZOOM)
+		: C.VECTOR_ROAD_MAX_ZOOM;
+	for (var zoom = maxZoom; zoom >= C.VECTOR_ROAD_MIN_ZOOM; zoom--) {
 		var tiles = enumerateVectorRoadTiles(bounds, zoom);
 		if (tiles.length <= maxTiles || zoom === C.VECTOR_ROAD_MIN_ZOOM) {
 			return tiles.length <= maxTiles ? tiles : [];
@@ -149,10 +152,53 @@ async function fetchVectorRoadTiles(tiles, template)
 	return results;
 }
 
-function getVectorRoadProfile(properties)
+function isVectorRoadAccessDenied(value)
 {
-	if (!properties || properties.access === false || properties.access === 0 ||
-		properties.access === '0' || properties.access === 'no') return null;
+	return value === false || value === 0 || value === '0' || value === 'no' || value === 'private';
+}
+
+function isVectorRoadAccessAllowed(value)
+{
+	return value === true || value === 1 || value === '1' || value === 'yes' ||
+		value === 'designated' || value === 'permissive' || value === 'official';
+}
+
+function getCycleRoadProfile(properties)
+{
+	if (isVectorRoadAccessDenied(properties.bicycle) || properties.bicycle === 'dismount' ||
+		properties.bicycle === 'use_sidepath') return null;
+	if (isVectorRoadAccessDenied(properties.access) && !isVectorRoadAccessAllowed(properties.bicycle)) return null;
+	var roadClass = properties.class;
+	var roadSubclass = properties.subclass;
+	var isExpressway = properties.expressway === 1 || properties.expressway === true || properties.expressway === '1';
+	var isUnpaved = properties.surface === 'unpaved';
+	if (roadClass === 'motorway' || roadClass === 'trunk' || isExpressway) return null;
+	if (roadClass === 'primary') return { speed: 17, spacing: 5 };
+	if (roadClass === 'secondary') return { speed: 17, spacing: 4 };
+	if (roadClass === 'tertiary') return { speed: 16, spacing: 3 };
+	var bicycleAllowed = isVectorRoadAccessAllowed(properties.bicycle);
+	if (roadClass === 'minor') return bicycleAllowed ? { speed: 15, spacing: 2.5 } : null;
+	if (roadClass === 'service') {
+		if (properties.service === 'driveway' || properties.service === 'parking_aisle') return null;
+		return bicycleAllowed ? { speed: 13, spacing: 2 } : null;
+	}
+	if (roadClass === 'track') {
+		return bicycleAllowed || properties.official === 1 || properties.official === true
+			? { speed: isUnpaved ? 10 : 13, spacing: 2 }
+			: null;
+	}
+	if (roadClass === 'path') {
+		if (roadSubclass === 'cycleway') return { speed: isUnpaved ? 13 : 18, spacing: 1.5 };
+		if (bicycleAllowed && roadSubclass !== 'steps') return { speed: isUnpaved ? 10 : 14, spacing: 1.5 };
+	}
+	return null;
+}
+
+function getVectorRoadProfile(properties, modeKey)
+{
+	if (!properties) return null;
+	if (modeKey === 'cycle') return getCycleRoadProfile(properties);
+	if (isVectorRoadAccessDenied(properties.access)) return null;
 	var roadClass = properties.class;
 	var isRamp = properties.ramp === 1 || properties.ramp === true || properties.ramp === '1';
 	var isExpressway = properties.expressway === 1 || properties.expressway === true || properties.expressway === '1';
@@ -179,7 +225,7 @@ function vectorTilePointToLatLng(point, tile, extent)
 	return [lat, lng];
 }
 
-function decodeVectorRoadLines(buffer, tile, decoder)
+function decodeVectorRoadLines(buffer, tile, decoder, modeKey)
 {
 	var vectorTile = new decoder.VectorTile(new decoder.Pbf(new Uint8Array(buffer)));
 	var layer = vectorTile.layers && vectorTile.layers.transportation;
@@ -187,7 +233,7 @@ function decodeVectorRoadLines(buffer, tile, decoder)
 	if (!layer) return lines;
 	for (var featureIndex = 0; featureIndex < layer.length; featureIndex++) {
 		var feature = layer.feature(featureIndex);
-		var profile = getVectorRoadProfile(feature.properties);
+		var profile = getVectorRoadProfile(feature.properties, modeKey);
 		if (!profile || feature.type !== 2) continue;
 		var geometry = feature.loadGeometry();
 		var bridge = feature.properties.brunnel === 'bridge';
@@ -280,12 +326,12 @@ function limitVectorRoadGraph(lines)
 	return graph.nodes.length <= maxNodes && graph.edges.length ? graph : null;
 }
 
-async function loadVectorRoadData(clat, clng, maxKm)
+async function loadVectorRoadData(clat, clng, maxKm, modeKey)
 {
 	if (!C.USE_VECTOR_ROADS) return null;
 	try {
 		var bounds = getVectorRoadBounds(clat, clng, maxKm);
-		var tiles = selectVectorRoadTiles(bounds);
+		var tiles = selectVectorRoadTiles(bounds, modeKey);
 		if (!tiles.length) return null;
 		var dependencies = await Promise.all([getVectorRoadMetadata(), getVectorRoadDecoder()]);
 		var template = dependencies[0].tiles[0];
@@ -294,7 +340,7 @@ async function loadVectorRoadData(clat, clng, maxKm)
 		for (var i = 0; i < buffers.length; i++) {
 			if (!buffers[i]) continue;
 			try {
-				lines.push.apply(lines, decodeVectorRoadLines(buffers[i], tiles[i], dependencies[1]));
+				lines.push.apply(lines, decodeVectorRoadLines(buffers[i], tiles[i], dependencies[1], modeKey));
 			} catch (error) {
 				// A malformed tile is non-fatal; the background mesh remains connected.
 			}

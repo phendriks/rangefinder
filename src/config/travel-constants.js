@@ -11,23 +11,24 @@ C.USE_SPEEDCLASS_COST				= true;
 C.REQUIRE_ROADBANDS					= true;
 
 // Tortuosity: tau_mode - network constraint per mode.
-// Values from Giacomin and Levinson 2015, Millward et al 2013.
+// Road-network circuity baseline from Giacomin and Levinson 2015.
 C.MODE_TORTUOSITY = {
 	drive							: 1.20,
-	moto							: 1.05,
+	cycle							: 1.20,
 };
 
 C.TERRAIN_TAU_DEFAULT				= 1;
 
-// Base speeds calibrated against real drives
+// Drive speed is calibrated against real drives. Cycle speed is the observed
+// mean trip speed reported by Rupi et al. 2018.
 C.MODE_SPEED_KMH = {
 	drive							: 115,
-	moto							: 100,
+	cycle							: 16,
 };
 
 C.MODE_NOTE = {
 	drive	: '115 km/h base - tau_mode 1.20 (Giacomin and Levinson 2015)',
-	moto	: '100 km/h base - tau_mode 1.05, filters traffic and mountain passes better',
+	cycle	: '16 km/h base (Rupi et al. 2018) - tau_mode 1.20 (Giacomin and Levinson 2015)',
 };
 
 // Road tile fallback and speed calibration

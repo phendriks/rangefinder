@@ -58,3 +58,15 @@ decoder modules, or tiles are unavailable. Set `C.USE_VECTOR_ROADS = false` in
 
 Road data uses the OpenMapTiles schema and OpenStreetMap data. No routing API is
 called; Dijkstra and contour generation remain local.
+
+Drive mode extracts motorways, trunks, ramps, and primary expressways. Cycle mode
+instead extracts cycle-accessible ordinary roads, tracks, and paths; it adaptively
+uses detail up to zoom 12 for small ranges while retaining the shared 200-tile and
+15,000-node limits.
+
+Mode calibration references:
+
+- Giacomin and Levinson (2015), *Road network circuity in metropolitan areas*,
+  https://doi.org/10.1068/b130131p
+- Rupi, Schweizer, and Bernardi (2018), *Evaluating cyclist patterns using GPS data
+  from smartphones*, https://doi.org/10.1049/iet-its.2017.0285

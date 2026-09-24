@@ -31,16 +31,17 @@ importScripts('contour.js');
 self.onmessage = async event => {
 	try {
 		const { outerKm, innerKm, clat, clng } = event.data;
+		const modeKey = event.data.modeKey === 'cycle' ? 'cycle' : 'drive';
 
 		if (!Number.isFinite(outerKm) || outerKm <= 0) throw new Error('Invalid outerKm.');
 		if (!Number.isFinite(clat) || !Number.isFinite(clng)) throw new Error('Invalid center coordinate.');
 
 		await ensureLandLoaded();
 		self.postMessage({ type: 'status', msg: 'Loading road network...' });
-		const vectorRoadData = await loadVectorRoadData(clat, clng, outerKm);
+		const vectorRoadData = await loadVectorRoadData(clat, clng, outerKm, modeKey);
 
 		self.postMessage({ type: 'status', msg: 'Building mesh...' });
-		const mesh = buildSitesMesh(clat, clng, outerKm, vectorRoadData);
+		const mesh = buildSitesMesh(clat, clng, outerKm, vectorRoadData, modeKey);
 
 		// Always send grid point data so the UI can enable Inspect grid after a calculation.
 		// Marker rendering stays lazy on the main thread, so the expensive part only happens
