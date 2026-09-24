@@ -26,6 +26,16 @@ function buildSitesMesh(clat, clng, maxKm, vectorRoadData) {
 
 	let sites = buildJitteredSites(minLat, maxLat, minLng, maxLng, clat, clng, N, stepKmHint);
 	sites = lloydRelax(sites, minLat, maxLat, minLng, maxLng, clat, clng, N, stepKmHint);
+	const haloSites = buildVectorRoadHaloSites(
+		vectorRoadData,
+		minLat,
+		maxLat,
+		minLng,
+		maxLng,
+		clat,
+		stepKmHint
+	);
+	if (haloSites.length) sites = sites.concat(haloSites);
 	const backgroundSiteCount = sites.length;
 	const roadNodes = vectorRoadData && Array.isArray(vectorRoadData.nodes) ? vectorRoadData.nodes : [];
 
@@ -67,6 +77,7 @@ function buildSitesMesh(clat, clng, maxKm, vectorRoadData) {
 		clat,
 		clng,
 		backgroundSiteCount,
+		haloSiteCount: haloSites.length,
 		vectorRoadEdgeCosts: null
 	};
 
@@ -92,6 +103,73 @@ function buildSitesMesh(clat, clng, maxKm, vectorRoadData) {
 	mesh.edgeCosts = buildEdgeCosts(mesh);
 	mesh.originHash = buildMeshOriginHash(mesh);
 	return mesh;
+}
+
+function buildVectorRoadHaloSites(vectorRoadData, minLat, maxLat, minLng, maxLng, clat, stepKmHint) {
+	if (!vectorRoadData || !Array.isArray(vectorRoadData.nodes) || !Array.isArray(vectorRoadData.edges)) return [];
+	const maxNodes = Math.max(0, Math.floor(Number(C.VECTOR_ROAD_HALO_MAX_NODES) || 0));
+	if (!maxNodes || !vectorRoadData.nodes.length || !vectorRoadData.edges.length) return [];
+
+	const offsetKm = clampNumber(
+		stepKmHint * C.VECTOR_ROAD_HALO_OFFSET_FACTOR,
+		C.VECTOR_ROAD_HALO_MIN_OFFSET_KM,
+		C.VECTOR_ROAD_HALO_MAX_OFFSET_KM
+	);
+	if (!Number.isFinite(offsetKm) || offsetKm <= 0) return [];
+
+	const validEdges = [];
+	for (let edgeIndex = 0; edgeIndex < vectorRoadData.edges.length; edgeIndex++) {
+		const edge = vectorRoadData.edges[edgeIndex];
+		if (!Array.isArray(edge) || edge.length < 2) continue;
+		const fromIndex = Number(edge[0]);
+		const toIndex = Number(edge[1]);
+		if (!Number.isInteger(fromIndex) || !Number.isInteger(toIndex) || fromIndex === toIndex) continue;
+		if (fromIndex < 0 || toIndex < 0 || fromIndex >= vectorRoadData.nodes.length || toIndex >= vectorRoadData.nodes.length) continue;
+		validEdges.push([fromIndex, toIndex]);
+	}
+	if (!validEdges.length) return [];
+
+	// Each selected road segment contributes one ordinary-cost point on either side.
+	// Sampling the edge list evenly keeps the refinement geographically distributed
+	// when the cap is lower than the number of available road segments.
+	const edgeBudget = Math.max(1, Math.floor(maxNodes / 2));
+	const selectedEdgeCount = Math.min(edgeBudget, validEdges.length);
+	const edgeStride = validEdges.length / selectedEdgeCount;
+	const latKm = C.KM_PER_DEG_LAT;
+	const cosLat = Math.max(0.05, Math.abs(Math.cos(clat * Math.PI / 180)));
+	const lngKm = latKm * cosLat;
+	const dedupeKm = Math.max(0.75, Math.min(2, offsetKm * 0.35));
+	const coordinateIndex = new Set();
+	const sites = [];
+
+	for (let selectedIndex = 0; selectedIndex < selectedEdgeCount && sites.length < maxNodes; selectedIndex++) {
+		const edge = validEdges[Math.floor(selectedIndex * edgeStride)];
+		const from = vectorRoadData.nodes[edge[0]];
+		const to = vectorRoadData.nodes[edge[1]];
+		if (!Array.isArray(from) || !Array.isArray(to)) continue;
+
+		const dx = (to[1] - from[1]) * lngKm;
+		const dy = (to[0] - from[0]) * latKm;
+		const segmentKm = Math.sqrt((dx * dx) + (dy * dy));
+		if (!Number.isFinite(segmentKm) || segmentKm <= 0) continue;
+		const midpointLat = (from[0] + to[0]) * 0.5;
+		const midpointLng = (from[1] + to[1]) * 0.5;
+		const normalX = -dy / segmentKm;
+		const normalY = dx / segmentKm;
+
+		for (let side = -1; side <= 1 && sites.length < maxNodes; side += 2) {
+			const lat = midpointLat + (normalY * offsetKm * side) / latKm;
+			const lng = midpointLng + (normalX * offsetKm * side) / lngKm;
+			if (lat < minLat || lat > maxLat || lng < minLng || lng > maxLng) continue;
+			const key = Math.round(lat * latKm / dedupeKm) + ',' +
+				Math.round(lng * lngKm / dedupeKm);
+			if (coordinateIndex.has(key)) continue;
+			coordinateIndex.add(key);
+			sites.push({ lat, lng });
+		}
+	}
+
+	return sites;
 }
 
 function addExplicitVectorRoadEdges(mesh, vectorRoadData) {

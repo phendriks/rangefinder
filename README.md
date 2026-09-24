@@ -47,7 +47,9 @@ To use a higher detail dataset:
 
 Calculations optionally load a bounded set of OpenFreeMap vector tiles and extract
 motorways, trunks, their ramps, and primary expressways. These lines become explicit
-mesh edges while the existing synthetic road/terrain tiles remain the fallback.
+mesh edges while the existing synthetic road/terrain tiles remain the fallback. A
+bounded set of ordinary-cost support points is placed on both sides of the sampled
+roads so the contour can transition out of fast-road corridors at finer resolution.
 
 The worker selects zoom 4-8 adaptively, requests no more than 200 tiles per
 calculation, caches tile promises, and falls back without failing when metadata,
