@@ -8,8 +8,21 @@ const SITE_COLOUR_WATER = '#2b6cc4';
 const SITE_FILL_OPACITY_LAND = 0.35;
 const SITE_FILL_OPACITY_CROSSING = 0.35;
 const SITE_FILL_OPACITY_WATER = 0.15;
-const OUTER_RANGE_STYLE = { color: '#0078a8', weight: 2, opacity: 0.8, fillColor: '#0096cc', fillOpacity: 0.1 };
-const INNER_RANGE_STYLE = { color: '#24ac36', weight: 2, opacity: 0.6, dashArray: '5 5', fillOpacity: 0.1 };
+const RANGE_STYLE = {
+	color: '#0078a8',
+	weight: 2,
+	opacity: 0.8,
+	fillColor: '#0096cc',
+	fillOpacity: 0.18
+};
+
+const DELTA_RANGE_STYLE = {
+	color: '#0078a8',
+	weight: 2,
+	opacity: 0.8,
+	dashArray: '4 6',
+	fill: false
+};
 
 const POINT_INSPECT_EL = document.getElementById('pi');
 const SHOW_GRID_EL = document.getElementById('show-grid');
@@ -217,13 +230,28 @@ function renderGrid(points)
 
 function renderResults(workerResult, outerLegendLabel, innerLegendLabel)
 {
-	const { outerGeo, innerGeo } = workerResult;
-	const outerLayer = L.geoJSON(outerGeo, { style: OUTER_RANGE_STYLE }).addTo(map);
-	const innerLayer = L.geoJSON(innerGeo, { style: INNER_RANGE_STYLE }).addTo(map);
+	const { outerGeo, innerGeo, deltaGeo } = workerResult;
 
-	mapLayers.push(outerLayer, innerLayer);
+	const rangeBand = turf.difference(outerGeo, innerGeo);
 
-	map.fitBounds(outerLayer.getBounds(), { padding: [C.MAP_FIT_PADDING_PX, C.MAP_FIT_PADDING_PX] });
+	const rangeLayer = L.geoJSON(rangeBand, {
+		style: RANGE_STYLE
+	}).addTo(map);
+
+	mapLayers.push(rangeLayer);
+
+	if (deltaGeo) {
+		const deltaLayer = L.geoJSON(deltaGeo, {
+			style: DELTA_RANGE_STYLE
+		}).addTo(map);
+
+		mapLayers.push(deltaLayer);
+	}
+
+	map.fitBounds(rangeLayer.getBounds(),
+				  {padding: [C.MAP_FIT_PADDING_PX, C.MAP_FIT_PADDING_PX]
+	});
+
 	OUTER_LABEL_EL.textContent = outerLegendLabel;
 	INNER_LABEL_EL.textContent = innerLegendLabel;
 	LEGEND_EL.classList.add('vis');
