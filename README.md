@@ -1,72 +1,60 @@
 # Range Finder
 
-Static browser app that computes reachable areas on a map.
+Static map app for estimating reachable driving and cycling areas. Calculations
+run locally in a worker; no routing API is used.
 
 ## Run locally
 
-From the project root:
+```sh
+python3 -m http.server 8000
+```
 
-	python3 -m http.server 8000
+Open http://localhost:8000/. Libraries and live road tiles require internet access.
+**Use my location** requires HTTPS or localhost and asks for permission when pressed.
 
-Open:
+## Configuration
 
-	http://localhost:8000/
+Files in `src/config/`:
 
-Notes:
-- This app uses Leaflet and Turf via CDN.
-- The worker is loaded from src/worker.
+- `base-constants.js`: shared enums and geometry constants
+- `travel-constants.js`: travel costs, roads, and cache budgets
+- `shape-constants.js`: mesh, contours, and tile/node limits
+- `ui-constants.js`: map defaults and control behaviour
 
-## Natural Earth country polygons
+## Roads and caching
 
+OpenFreeMap tiles supply driving roads and cycle-accessible roads, tracks, and
+paths. Synthetic regional data in `src/data/` provides a fallback. Calculations
+use at most 200 tiles and 15,000 road nodes, with zoom 4-8 for driving and up to 12
+for cycling. Disable live roads with `C.USE_VECTOR_ROADS = false`.
 
-To generate a global set from Natural Earth and write it into
-src/data/countriesNaturalEarth.js:
+Selecting a location starts background preparation, fetching nearby tiles first.
+The persistent worker reuses tiles, decoded roads, tile scores, and matching
+results. Changing only the minimum range reuses the mesh and distance field.
+**Show Range** continues matching preparation already underway.
 
-	python3 scripts/build-country-polygons.py
+Caches stay in memory with smaller budgets and preload limits on mobile,
+low-memory devices, and data-saving connections. Failed downloads are retried;
+cancelled work cannot display stale results. Decoded memory budgets are estimates.
 
-To use a higher detail dataset:
+## Tests
 
-	python3 scripts/build-country-polygons.py --50m
+```sh
+node scripts/test-caching.cjs
+```
 
-## Config files
+## Country polygons
 
-- `src/config/base-constants.js`: shared primitives and global bounds
-- `src/config/travel-constants.js`: routing, roads, crossings, and `speedClass` tuning
-- `src/config/shape-constants.js`: grid, mesh, and contour generation
-- `src/config/ui-constants.js`: map defaults, colours, and browser/UI behaviour
+Regenerate `src/data/countriesNaturalEarth.js` from Natural Earth:
 
-## Road tile sources
+```sh
+python3 scripts/build-country-polygons.py
+```
 
-- `src/data/network-tiles.js`: shared network tile helpers and synthetic region registration
-- `src/data/europe-tiles.js`: Europe road tiles plus synthesized terrain severity
-- `src/data/north-america-tiles.js`: synthetic North America road and terrain tiles
-- `src/data/north-africa-tiles.js`: synthetic North Africa road and terrain tiles
-- `src/data/middle-east-tiles.js`: synthetic Middle East road and terrain tiles
+Add `--50m` for higher detail.
 
-## Live fast-road geometry
+## Sources
 
-Calculations optionally load a bounded set of OpenFreeMap vector tiles and extract
-motorways, trunks, their ramps, and primary expressways. These lines become explicit
-mesh edges while the existing synthetic road/terrain tiles remain the fallback. A
-bounded set of ordinary-cost support points is placed on both sides of the sampled
-roads so the contour can transition out of fast-road corridors at finer resolution.
-
-The worker selects zoom 4-8 adaptively, requests no more than 200 tiles per
-calculation, caches tile promises, and falls back without failing when metadata,
-decoder modules, or tiles are unavailable. Set `C.USE_VECTOR_ROADS = false` in
-`src/config/travel-constants.js` to disable live road loading.
-
-Road data uses the OpenMapTiles schema and OpenStreetMap data. No routing API is
-called; Dijkstra and contour generation remain local.
-
-Drive mode extracts motorways, trunks, ramps, and primary expressways. Cycle mode
-instead extracts cycle-accessible ordinary roads, tracks, and paths; it adaptively
-uses detail up to zoom 12 for small ranges while retaining the shared 200-tile and
-15,000-node limits.
-
-Mode calibration references:
-
-- Giacomin and Levinson (2015), *Road network circuity in metropolitan areas*,
-  https://doi.org/10.1068/b130131p
-- Rupi, Schweizer, and Bernardi (2018), *Evaluating cyclist patterns using GPS data
-  from smartphones*, https://doi.org/10.1049/iet-its.2017.0285
+Roads: OpenStreetMap / OpenMapTiles via OpenFreeMap. Land: Natural Earth.
+Mode calibration: [Giacomin & Levinson (2015)](https://doi.org/10.1068/b130131p)
+and [Rupi et al. (2018)](https://doi.org/10.1049/iet-its.2017.0285).

@@ -37,6 +37,7 @@ function setMode(modeKey)
 	activeModeKey = modeKey;
 	ELS.modeNote.textContent = C.MODE_NOTE[modeKey] || '';
 	clearOverlay();
+	schedulePreparation(true);
 }
 
 function syncRangePair(nextValue, minValue, maxValue, inputEl, sliderEl)
@@ -50,24 +51,28 @@ function setTimeMin(nextValue)
 {
 	const maxAllowed = +ELS.maxTimeInput.value - C.UI_TIME_STEP_HOURS;
 	syncRangePair(nextValue, C.UI_TIME_MIN_HOURS, maxAllowed, ELS.minTimeInput, ELS.minTimeSlider);
+	schedulePreparation();
 }
 
 function setTimeMax(nextValue)
 {
 	const minAllowed = +ELS.minTimeInput.value + C.UI_TIME_STEP_HOURS;
 	syncRangePair(nextValue, minAllowed, C.UI_TIME_MAX_HOURS, ELS.maxTimeInput, ELS.maxTimeSlider);
+	schedulePreparation();
 }
 
 function setDistanceMin(nextValue)
 {
 	const maxAllowed = +ELS.maxDistanceInput.value - C.UI_DIST_STEP_KM;
 	syncRangePair(nextValue, C.UI_DIST_MIN_KM, maxAllowed, ELS.minDistanceInput, ELS.minDistanceSlider);
+	schedulePreparation();
 }
 
 function setDistanceMax(nextValue)
 {
 	const minAllowed = +ELS.minDistanceInput.value + C.UI_DIST_STEP_KM;
 	syncRangePair(nextValue, minAllowed, C.UI_DIST_MAX_KM, ELS.maxDistanceInput, ELS.maxDistanceSlider);
+	schedulePreparation();
 }
 
 function setMeasureLabelState(activeEl, mutedEl)
@@ -91,13 +96,7 @@ function updateMeasureMode()
 	}
 
 	clearOverlay();
-}
-
-function stopActiveWorker()
-{
-	if (!worker) return;
-	worker.terminate();
-	worker = null;
+	schedulePreparation(true);
 }
 
 function showSuggestions()
@@ -129,17 +128,13 @@ function setCalcBusyState(isBusy)
 	if (!isBusy) ELS.progressBar.style.width = '0%';
 }
 
-function applyAddress(lat, lng)
-{
-	placePin(lat, lng);
-}
-
 function placePin(lat, lng)
 {
 	coords = { lat, lng };
 	if (pin) map.removeLayer(pin);
 	pin = L.marker([lat, lng]).addTo(map);
 	clearOverlay();
+	schedulePreparation(true);
 }
 
 async function doSearch(query)
@@ -181,7 +176,6 @@ function renderSuggestions(results)
 			hideSuggestions();
 			placePin(lat, lng);
 			map.setView([lat, lng], C.MAP_GEOCODE_ZOOM);
-			applyAddress(lat, lng);
 		});
 		ELS.suggestions.appendChild(suggestionEl);
 	});
@@ -203,7 +197,7 @@ async function handleMapClick(evt)
 			cache: 'no-store',
 			headers: C.NOMINATIM_HEADERS
 		}).then(response => response.json());
-		if (!result?.lat) return;
+		if (!result?.lat || coords?.lat !== lat || coords?.lng !== lng) return;
 
 		const reverseDistanceM = turf.distance(
 			turf.point([lng, lat]),
@@ -215,7 +209,6 @@ async function handleMapClick(evt)
 			lastQuery = result.display_name;
 		}
 
-		applyAddress(lat, lng);
 	} catch {}
 }
 
@@ -262,12 +255,12 @@ function handleWorkerMessage(evt, outerLegendLabel, innerLegendLabel)
 			renderGrid(msg.pts);
 			break;
 		case 'done':
-			stopActiveWorker();
+			activeCalculation = null;
 			setCalcBusyState(false);
 			renderResults(msg, outerLegendLabel, innerLegendLabel);
 			break;
 		case 'error':
-			stopActiveWorker();
+			activeCalculation = null;
 			setCalcBusyState(false);
 			alert(`Error: ${msg.msg}`);
 			break;
@@ -281,27 +274,12 @@ function startCalculation()
 		return;
 	}
 
-	stopActiveWorker();
-
 	const rangeRequest = getRangeRequest();
 	clearOverlay(false);
 	setCalcBusyState(true);
 	setStatus('Initialising...', 0);
 
-	worker = new Worker('./src/worker/rangeWorker.js');
-	worker.onmessage = evt => handleWorkerMessage(evt, rangeRequest.outerLegendLabel, rangeRequest.innerLegendLabel);
-	worker.onerror = evt => {
-		stopActiveWorker();
-		setCalcBusyState(false);
-		alert(`Worker error: ${evt.message}`);
-	};
-	worker.postMessage({
-		clat: coords.lat,
-		clng: coords.lng,
-		outerKm: rangeRequest.outerKm,
-		innerKm: rangeRequest.innerKm,
-		modeKey: activeModeKey
-	});
+	submitCalculation(rangeRequest);
 }
 
 MODE_BUTTONS.forEach(button => {
@@ -354,3 +332,33 @@ document.addEventListener('click', evt => {
 
 map.on('click', handleMapClick);
 ELS.calc.addEventListener('click', startCalculation);
+
+const USE_LOCATION_BUTTON = document.getElementById('use-location');
+USE_LOCATION_BUTTON.addEventListener('click', () => {
+	if (!navigator.geolocation) {
+		alert('Location is unavailable. Select an address or tap the map.');
+		return;
+	}
+	USE_LOCATION_BUTTON.disabled = true;
+	USE_LOCATION_BUTTON.textContent = 'Locating...';
+	const previousCoords = coords;
+	function finishLocating() {
+		USE_LOCATION_BUTTON.disabled = false;
+		USE_LOCATION_BUTTON.textContent = 'Use my location';
+	}
+	navigator.geolocation.getCurrentPosition(position => {
+		finishLocating();
+		// A map click or address selection while locating takes precedence.
+		if (coords !== previousCoords) return;
+		const { latitude: lat, longitude: lng } = position.coords;
+		map.setView([lat, lng], C.MAP_GEOCODE_ZOOM);
+		handleMapClick({ latlng: { lat, lng } });
+	}, () => {
+		finishLocating();
+		alert('Could not get your location. Select an address or tap the map.');
+	}, { enableHighAccuracy: false, maximumAge: 60000, timeout: 10000 });
+});
+
+// Warming does not require a location or a geolocation permission prompt.
+if (typeof requestIdleCallback === 'function') requestIdleCallback(warmRangeWorker, { timeout: 1500 });
+else setTimeout(warmRangeWorker, 200);

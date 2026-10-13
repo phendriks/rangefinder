@@ -9,6 +9,7 @@ importScripts('../config/base-constants.js');
 importScripts('../config/travel-constants.js');
 importScripts('../config/shape-constants.js');
 importScripts('../config/ui-constants.js');
+importScripts('../shared/lruCache.js');
 importScripts('../shared/math.js');
 importScripts('../shared/geo.js');
 importScripts('../shared/minHeap.js');
@@ -28,76 +29,9 @@ importScripts('vectorRoadTiles.js');
 importScripts('mesh.js');
 importScripts('contour.js');
 
-self.onmessage = async event => {
-	try {
-		const { outerKm, innerKm, clat, clng } = event.data;
-		const modeKey = event.data.modeKey === 'cycle' ? 'cycle' : 'drive';
+importScripts('calculationJobs.js');
 
-		if (!Number.isFinite(outerKm) || outerKm <= 0) throw new Error('Invalid outerKm.');
-		if (!Number.isFinite(clat) || !Number.isFinite(clng)) throw new Error('Invalid center coordinate.');
-
-		await ensureLandLoaded();
-		self.postMessage({ type: 'status', msg: 'Loading road network...' });
-		const vectorRoadData = await loadVectorRoadData(clat, clng, outerKm, modeKey);
-
-		self.postMessage({ type: 'status', msg: 'Building mesh...' });
-		const mesh = buildSitesMesh(clat, clng, outerKm, vectorRoadData, modeKey);
-
-		// Always send grid point data so the UI can enable Inspect grid after a calculation.
-		// Marker rendering stays lazy on the main thread, so the expensive part only happens
-		// when the user actually enables the overlay.
-		self.postMessage({
-			type: 'grid',
-			pts: mesh.pts.map((point, pointIndex) => {
-				const landType = mesh.landTypes[pointIndex];
-				const hasLandData = landType !== C.CELL_WATER;
-				return {
-					lat: point[0],
-					lng: point[1],
-					cell: mesh.cellTypes[pointIndex],
-					landType,
-					speedClass: hasLandData ? mesh.speedClasses[pointIndex] : null,
-					roadBands: hasLandData ? mesh.roadBands?.[pointIndex] : null,
-					terrainSeverity: hasLandData ? mesh.terrainSeverities?.[pointIndex] : null
-				};
-			})
-		});
-
-		self.postMessage({ type: 'status', msg: 'Walking land graph...' });
-		const costs = computeDistanceField(mesh, outerKm, clat, clng);
-
-		self.postMessage({ type: 'status', msg: 'Extracting geometry...' });
-		const outer = computeIsoPolygonSites(mesh, costs, outerKm);
-		const inner = innerKm > 0 ? computeIsoPolygonSites(mesh, costs, innerKm) : null;
-		const deltaKm = (outerKm + innerKm) / 2;
-		const delta = deltaKm > 0
-			? computeIsoPolygonSites(mesh, costs, deltaKm)
-			: null;
-		
-		if (!outer || !outer.ring || outer.ring.length < 4) {
-			self.postMessage({
-				type: 'error',
-				msg: 'No reachable land cells were found for this range. Try a smaller range or pick a land location.'
-			});
-			return;
-		}
-
-		// If inner is missing, fall back to a harmless polygon so the app renderer does not crash.
-		const outerGeo = outer.geo;
-		const innerGeo = inner?.geo || turf.polygon([outer.ring], { kind: 'inner-fallback' });
-
-		self.postMessage({
-			type: 'done',
-			outerRing: outer.ring,
-			innerRing: inner?.ring || null,
-			outerGeo,
-			innerGeo,
-			deltaGeo: delta?.geo || null
-		});
-	} catch (err) {
-		self.postMessage({ type: 'error', msg: err?.message ? String(err.message) : 'Unknown worker error' });
-	}
-};
+self.onmessage = handleRangeWorkerMessage;
 
 function computeDistanceField(mesh, maxKm, clat, clng)
 {

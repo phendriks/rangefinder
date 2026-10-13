@@ -260,15 +260,13 @@ function renderResults(workerResult, outerLegendLabel, innerLegendLabel)
 
 function clearOverlay(resetUi = true)
 {
-	if (worker) {
-		worker.terminate();
-		worker = null;
-	}
+	if (resetUi) cancelCalculation();
 
 	mapLayers.forEach(layer => map.removeLayer(layer));
 	mapLayers = [];
 	gridMarkers.forEach(marker => map.removeLayer(marker));
 	gridMarkers = [];
+	gridSourceData = [];
 	setInspectPoints([]);
 	hidePointInspect();
 

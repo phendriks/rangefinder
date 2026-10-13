@@ -35,6 +35,7 @@
 					<input type="text" id="loc" placeholder="Type an address or tap the map..." autocomplete="off" spellcheck="false">
 					<div id="sug"></div>
 				</div>
+				<button id="use-location" class="location-button" type="button">Use my location</button>
 			</div>
 
 			<div class="fl field-group">
@@ -178,14 +179,11 @@
 	<script src="./src/config/travel-constants.js"></script>
 	<script src="./src/config/shape-constants.js"></script>
 	<script src="./src/config/ui-constants.js"></script>
+	<script src="./src/shared/lruCache.js"></script>
 	<script src="./src/data/network-tiles.js"></script>
-	<script src="./src/data/europe-tiles.js"></script>
-	<script src="./src/data/north-america-tiles.js"></script>
-	<script src="./src/data/north-africa-tiles.js"></script>
-	<script src="./src/data/middle-east-tiles.js"></script>
-	<script src="./src/data/crossingPolygons.js"></script>
 	<script src="./src/app/app.js"></script>
 	<script src="./src/app/render.js"></script>
+	<script src="./src/app/calculation.js"></script>
 	<script src="./src/app/ui.js"></script>
 	<script src="./src/app/mobile.js"></script>
 </body>

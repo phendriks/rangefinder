@@ -53,6 +53,7 @@ const TERRAIN_FEATURE_WEIGHT_ZONE = 1.00;
 C.NETWORK_TILES = self.C && self.C.NETWORK_TILES ? self.C.NETWORK_TILES : Object.create(null);
 
 const NETWORK_TILE_SOURCES = [];
+let networkTileRecordCache = new LruCache(4096);
 const NETWORK_TILE_LAND_CACHE = Object.create(null);
 
 let networkLandIndex = null;
@@ -235,6 +236,8 @@ function getNetworkTileRecord(tileKey)
 {
 	var cached = C.NETWORK_TILES[tileKey];
 	if (cached) return cached;
+	cached = networkTileRecordCache.get(tileKey);
+	if (cached !== undefined) return cached;
 
 	var tileInfo = getNetworkTileInfoFromTileKey(tileKey);
 	if (!tileInfo) return null;
@@ -244,10 +247,11 @@ function getNetworkTileRecord(tileKey)
 		if (!sourceRecord) continue;
 		var normalizedRecord = buildNetworkTileRecord(sourceRecord.road, sourceRecord);
 		if (!normalizedRecord) continue;
-		C.NETWORK_TILES[tileKey] = normalizedRecord;
+		networkTileRecordCache.set(tileKey, normalizedRecord);
 		return normalizedRecord;
 	}
 
+	networkTileRecordCache.set(tileKey, null);
 	return null;
 }
 

@@ -3,7 +3,27 @@
 
 var vectorRoadMetadataPromise = null;
 var vectorRoadDecoderPromise = null;
-var vectorRoadTileCache = new Map();
+let vectorRoadTileCache = new LruCache(C.VECTOR_ROAD_CACHE_TILES, C.VECTOR_ROAD_CACHE_BYTES);
+let vectorRoadDecodedCache = new LruCache(C.VECTOR_ROAD_CACHE_TILES, C.VECTOR_ROAD_DECODE_CACHE_BYTES);
+const vectorRoadPendingTiles = new Map();
+let vectorRoadLowMemory = false;
+
+function configureVectorRoadCache(lowMemory) {
+	vectorRoadLowMemory = lowMemory;
+	const entries = lowMemory ? C.VECTOR_ROAD_MOBILE_CACHE_TILES : C.VECTOR_ROAD_CACHE_TILES;
+	vectorRoadTileCache = new LruCache(entries, lowMemory ? C.VECTOR_ROAD_MOBILE_CACHE_BYTES : C.VECTOR_ROAD_CACHE_BYTES);
+	vectorRoadDecodedCache = new LruCache(entries, lowMemory ? C.VECTOR_ROAD_MOBILE_DECODE_BYTES : C.VECTOR_ROAD_DECODE_CACHE_BYTES);
+}
+
+function withVectorRoadTimeout(promise) {
+	let timeout;
+	return Promise.race([
+		promise,
+		new Promise((resolve, reject) => {
+			timeout = setTimeout(() => reject(new Error('Vector-road dependency timed out.')), C.VECTOR_ROAD_FETCH_TIMEOUT_MS);
+		})
+	]).finally(() => clearTimeout(timeout));
+}
 
 function getVectorRoadBounds(clat, clng, maxKm)
 {
@@ -53,9 +73,10 @@ function selectVectorRoadTiles(bounds, modeKey)
 		? Math.max(C.VECTOR_ROAD_MAX_ZOOM, Number(C.VECTOR_ROAD_CYCLE_MAX_ZOOM) || C.VECTOR_ROAD_MAX_ZOOM)
 		: C.VECTOR_ROAD_MAX_ZOOM;
 	for (var zoom = maxZoom; zoom >= C.VECTOR_ROAD_MIN_ZOOM; zoom--) {
-		var tiles = enumerateVectorRoadTiles(bounds, zoom);
-		if (tiles.length <= maxTiles || zoom === C.VECTOR_ROAD_MIN_ZOOM) {
-			return tiles.length <= maxTiles ? tiles : [];
+		var count = (lngToVectorTileX(bounds.maxLng, zoom) - lngToVectorTileX(bounds.minLng, zoom) + 1) *
+			(latToVectorTileY(bounds.minLat, zoom) - latToVectorTileY(bounds.maxLat, zoom) + 1);
+		if (count <= maxTiles || zoom === C.VECTOR_ROAD_MIN_ZOOM) {
+			return count <= maxTiles ? enumerateVectorRoadTiles(bounds, zoom) : [];
 		}
 	}
 	return [];
@@ -64,7 +85,7 @@ function selectVectorRoadTiles(bounds, modeKey)
 async function getVectorRoadMetadata()
 {
 	if (!vectorRoadMetadataPromise) {
-		vectorRoadMetadataPromise = fetch(C.VECTOR_ROAD_TILEJSON_URL).then(function(response) {
+		vectorRoadMetadataPromise = withVectorRoadTimeout(fetch(C.VECTOR_ROAD_TILEJSON_URL)).then(function(response) {
 			if (!response.ok) throw new Error('Vector-road TileJSON unavailable.');
 			return response.json();
 		}).then(function(tileJson) {
@@ -83,10 +104,10 @@ async function getVectorRoadMetadata()
 async function getVectorRoadDecoder()
 {
 	if (!vectorRoadDecoderPromise) {
-		vectorRoadDecoderPromise = Promise.all([
+		vectorRoadDecoderPromise = withVectorRoadTimeout(Promise.all([
 			import(C.VECTOR_ROAD_PBF_MODULE_URL),
 			import(C.VECTOR_ROAD_MVT_MODULE_URL)
-		]).then(function(modules) {
+		])).then(function(modules) {
 			return {
 				Pbf: modules[0].default || modules[0].Pbf,
 				VectorTile: modules[1].VectorTile || modules[1].default
@@ -107,11 +128,20 @@ function buildVectorRoadTileUrl(template, tile)
 	return template.replace('{z}', tile.z).replace('{x}', tile.x).replace('{y}', tile.y);
 }
 
-function fetchVectorRoadTile(url)
+function fetchVectorRoadTile(url, signal)
 {
-	if (vectorRoadTileCache.has(url)) return vectorRoadTileCache.get(url);
+	var cached = vectorRoadTileCache.get(url);
+	if (cached !== undefined) return Promise.resolve(cached);
+	var pending = vectorRoadPendingTiles.get(url);
+	if (pending && !pending.signal?.aborted) return pending.promise;
 	var request = new Promise(function(resolve, reject) {
 		var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+		function cancel() {
+			if (controller) controller.abort();
+			reject(new Error('Vector-road preload cancelled.'));
+		}
+		if (signal && signal.aborted) { cancel(); return; }
+		if (signal) signal.addEventListener('abort', cancel, { once: true });
 		var timeoutId = setTimeout(function() {
 			if (controller) controller.abort();
 			reject(new Error('Vector-road tile timed out.'));
@@ -119,28 +149,51 @@ function fetchVectorRoadTile(url)
 		fetch(url, controller ? { signal: controller.signal } : undefined).then(function(response) {
 			if (!response.ok) throw new Error('Vector-road tile request failed.');
 			return response.arrayBuffer();
-		}).then(resolve, reject).finally(function() { clearTimeout(timeoutId); });
-	}).catch(function(error) {
-		vectorRoadTileCache.delete(url);
-		throw error;
+		}).then(resolve, reject).finally(function() {
+			clearTimeout(timeoutId);
+			if (signal) signal.removeEventListener('abort', cancel);
+		});
+	}).then(function(buffer) {
+		vectorRoadTileCache.set(url, buffer, buffer.byteLength);
+		return buffer;
+	}).finally(function() {
+		if (vectorRoadPendingTiles.get(url)?.promise === request) vectorRoadPendingTiles.delete(url);
 	});
-	vectorRoadTileCache.set(url, request);
+	vectorRoadPendingTiles.set(url, { promise: request, signal: signal });
 	return request;
 }
 
-async function fetchVectorRoadTiles(tiles, template)
+async function fetchVectorRoadTiles(tiles, template, options = {})
 {
 	var results = new Array(tiles.length);
+	// Fetch near the pin first, but keep results in their original tile order.
+	// Changing decode order would change graph node IDs and mesh jitter.
+	var order = tiles.map(function(tile, index) {
+		var x = options.clng === undefined ? tile.x : lngToVectorTileX(options.clng, tile.z);
+		var y = options.clat === undefined ? tile.y : latToVectorTileY(options.clat, tile.z);
+		return { index: index, distance: (tile.x - x) ** 2 + (tile.y - y) ** 2 };
+	}).sort(function(a, b) { return a.distance - b.distance || a.index - b.index; });
 	var nextIndex = 0;
+	var attemptedCount = 0;
 	var deadline = Date.now() + Math.max(C.VECTOR_ROAD_FETCH_TIMEOUT_MS, C.VECTOR_ROAD_TOTAL_TIMEOUT_MS);
 	var concurrency = Math.max(1, Math.min(16, Number(C.VECTOR_ROAD_FETCH_CONCURRENCY) || 8));
+	if (vectorRoadLowMemory) concurrency = Math.min(concurrency, C.VECTOR_ROAD_MOBILE_CONCURRENCY);
 	async function worker() {
 		while (true) {
-			if (Date.now() >= deadline) return;
-			var index = nextIndex++;
-			if (index >= tiles.length) return;
+			if (Date.now() >= deadline || options.signal?.aborted) return;
+			var next = nextIndex++;
+			var limit = options.background && !options.isForeground?.()
+				? (vectorRoadLowMemory ? C.VECTOR_ROAD_MOBILE_PRELOAD_TILES : C.VECTOR_ROAD_PRELOAD_TILES)
+				: tiles.length;
+			if (next >= Math.min(tiles.length, limit)) return;
+			var index = order[next].index;
+			attemptedCount++;
 			try {
-				results[index] = await fetchVectorRoadTile(buildVectorRoadTileUrl(template, tiles[index]));
+				var url = buildVectorRoadTileUrl(template, tiles[index]);
+				var decoded = options.modeKey ? vectorRoadDecodedCache.get(url + '|' + options.modeKey) : undefined;
+				results[index] = decoded === undefined
+					? await fetchVectorRoadTile(url, options.signal)
+					: { decoded: decoded };
 			} catch (error) {
 				results[index] = null;
 			}
@@ -149,6 +202,7 @@ async function fetchVectorRoadTiles(tiles, template)
 	var workers = [];
 	for (var i = 0; i < Math.min(concurrency, tiles.length); i++) workers.push(worker());
 	await Promise.all(workers);
+	results.preloadOnly = attemptedCount < tiles.length && options.background;
 	return results;
 }
 
@@ -326,26 +380,56 @@ function limitVectorRoadGraph(lines)
 	return graph.nodes.length <= maxNodes && graph.edges.length ? graph : null;
 }
 
-async function loadVectorRoadData(clat, clng, maxKm, modeKey)
+async function loadVectorRoadData(clat, clng, maxKm, modeKey, options = {})
 {
 	if (!C.USE_VECTOR_ROADS) return null;
 	try {
 		var bounds = getVectorRoadBounds(clat, clng, maxKm);
 		var tiles = selectVectorRoadTiles(bounds, modeKey);
-		if (!tiles.length) return null;
+		if (!tiles.length) return { nodes: [], edges: [], cacheable: true };
 		var dependencies = await Promise.all([getVectorRoadMetadata(), getVectorRoadDecoder()]);
+		if (options.signal?.aborted) return null;
 		var template = dependencies[0].tiles[0];
-		var buffers = await fetchVectorRoadTiles(tiles, template);
+		options.clat = clat;
+		options.clng = clng;
+		options.modeKey = modeKey;
+		var buffers = await fetchVectorRoadTiles(tiles, template, options);
+		// A foreground click may arrive as a bounded mobile preload finishes.
+		if (buffers.preloadOnly && options.isForeground?.() && !options.signal?.aborted) {
+			buffers = await fetchVectorRoadTiles(tiles, template, { ...options, background: false });
+		}
 		var lines = [];
+		var cacheable = !buffers.preloadOnly;
 		for (var i = 0; i < buffers.length; i++) {
-			if (!buffers[i]) continue;
+			if (options.signal?.aborted) return null;
+			if (!buffers[i]) { cacheable = false; continue; }
 			try {
-				lines.push.apply(lines, decodeVectorRoadLines(buffers[i], tiles[i], dependencies[1], modeKey));
+				var decodeKey = buildVectorRoadTileUrl(template, tiles[i]) + '|' + modeKey;
+				var decoded = buffers[i].decoded || vectorRoadDecodedCache.get(decodeKey);
+				if (decoded === undefined) {
+					decoded = decodeVectorRoadLines(buffers[i], tiles[i], dependencies[1], modeKey);
+					var bytes = decoded.reduce(function(total, line) { return total + 128 + line.points.length * 64; }, 0);
+					vectorRoadDecodedCache.set(decodeKey, decoded, bytes);
+				}
+				// Avoid apply's argument limit on dense cycle tiles.
+				for (var lineIndex = 0; lineIndex < decoded.length; lineIndex++) lines.push(decoded[lineIndex]);
 			} catch (error) {
+				cacheable = false;
 				// A malformed tile is non-fatal; the background mesh remains connected.
 			}
+			if (i % 8 === 7) await new Promise(function(resolve) { setTimeout(resolve, 0); });
 		}
-		return lines.length ? limitVectorRoadGraph(lines) : null;
+		if (buffers.preloadOnly) {
+			// Promotion can also arrive during a decode yield, after the first
+			// promotion check. Finish the missing tiles before resolving Show.
+			if (options.isForeground?.() && !options.signal?.aborted) {
+				return loadVectorRoadData(clat, clng, maxKm, modeKey, { ...options, background: false });
+			}
+			return { preloadOnly: true };
+		}
+		if (options.signal?.aborted) return null;
+		var graph = lines.length ? limitVectorRoadGraph(lines) : null;
+		return { nodes: graph ? graph.nodes : [], edges: graph ? graph.edges : [], cacheable: cacheable };
 	} catch (error) {
 		return null;
 	}

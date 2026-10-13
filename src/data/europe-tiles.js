@@ -3585,23 +3585,16 @@ const EUROPE_ROAD_TILES = {
 	'70.5_29.5': { fast: 4, main: 14, mid: 23, local: 32 }
 };
 
-const EUROPE_NETWORK_TILES = Object.create(null);
-
-Object.keys(EUROPE_ROAD_TILES).forEach(tileKey => {
-	var tileInfo = getNetworkTileInfoFromTileKey(tileKey);
-	if (!tileInfo) return;
-	EUROPE_NETWORK_TILES[tileKey] = buildNetworkTileRecord(
-		EUROPE_ROAD_TILES[tileKey],
-		buildTerrainDataForRegion(EUROPE_TERRAIN_CONFIG, tileInfo)
-	);
-});
-
-mergeNetworkTiles(EUROPE_NETWORK_TILES);
-
 registerNetworkTileSource(tileInfo => {
+	// Explicit road records previously existed before regional bounds/land
+	// checks. Keep that precedence, but synthesize terrain only on demand.
+	if (Object.prototype.hasOwnProperty.call(EUROPE_ROAD_TILES, tileInfo.tileKey)) {
+		return buildNetworkTileRecord(
+			EUROPE_ROAD_TILES[tileInfo.tileKey],
+			buildTerrainDataForRegion(EUROPE_TERRAIN_CONFIG, tileInfo)
+		);
+	}
 	if (!isTileInfoInBounds(tileInfo, EUROPE_BOUNDS)) return null;
 	if (!isLandPoint(tileInfo.centerLat, tileInfo.centerLng)) return null;
-	var existingRecord = EUROPE_NETWORK_TILES[tileInfo.tileKey];
-	if (existingRecord) return existingRecord;
 	return buildNetworkTileRecord(null, buildTerrainDataForRegion(EUROPE_TERRAIN_CONFIG, tileInfo));
 });

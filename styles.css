@@ -870,3 +870,20 @@ body.mini-bar-visible .leaflet-bottom.leaflet-right {
 		display: none;
 	}
 }
+.location-button {
+	align-self: flex-start;
+	margin-top: 8px;
+	padding: 4px 0;
+	border: 0;
+	background: transparent;
+	color: #0078a8;
+	font: inherit;
+	font-size: 13px;
+	cursor: pointer;
+	text-decoration: underline;
+}
+
+.location-button:disabled {
+	opacity: 0.6;
+	cursor: wait;
+}

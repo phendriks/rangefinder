@@ -11,7 +11,8 @@ const NETWORK_TILE_DEFAULT_KM = {
 const NETWORK_TILE_DEFAULT_TERRAIN_SCORE = 0.10;
 const NETWORK_TILE_DECIMALS = 2;
 
-var networkTileAssignmentCache = Object.create(null);
+let networkTileAssignmentCache = new LruCache(4096);
+const networkTileScoreCache = new WeakMap();
 
 function getNetworkTileFallbackRadiusSteps()
 {
@@ -113,12 +114,12 @@ function getNetworkTileRecordForPoint(lat, lng)
 {
 	var units = getNetworkTileUnitsFromLatLng(lat, lng);
 	var cacheKey = buildNetworkTileKeyFromUnits(units.latUnits, units.lngUnits);
-	var cached = networkTileAssignmentCache[cacheKey];
+	var cached = networkTileAssignmentCache.get(cacheKey);
 	if (cached !== undefined) return cached;
 
 	var exactRecord = getNetworkTileRecord(cacheKey);
 	if (exactRecord && exactRecord.road && exactRecord.terrainSeverity !== null && exactRecord.terrainSeverity !== undefined) {
-		networkTileAssignmentCache[cacheKey] = exactRecord;
+		networkTileAssignmentCache.set(cacheKey, exactRecord);
 		return exactRecord;
 	}
 
@@ -176,7 +177,7 @@ function getNetworkTileRecordForPoint(lat, lng)
 		terrainScore: terrainData.terrainScore
 	};
 	resolvedRecord.road = normalizeRoadStats(resolvedRecord.road);
-	networkTileAssignmentCache[cacheKey] = resolvedRecord;
+	networkTileAssignmentCache.set(cacheKey, resolvedRecord);
 	return resolvedRecord;
 }
 
@@ -191,8 +192,17 @@ function assignTileEnums(mesh)
 
 		var point = mesh.pts[pointIndex];
 		var tileRecord = getNetworkTileRecordForPoint(point[0], point[1]);
-		var roadStats = tileRecord ? tileRecord.road : null;
-		var roadBandsKm = getRoadBandsFromTileStats(roadStats);
+		var tileScore = tileRecord ? networkTileScoreCache.get(tileRecord) : null;
+		if (!tileScore) {
+			var roadStats = tileRecord ? tileRecord.road : null;
+			var bands = getRoadBandsFromTileStats(roadStats);
+			tileScore = {
+				roadBands: bands,
+				speedClass: computeSpeedClassFromRoadBands(bands, tileRecord ? tileRecord.terrainSeverity : C.TERRAIN_NORMAL)
+			};
+			if (tileRecord) networkTileScoreCache.set(tileRecord, tileScore);
+		}
+		var roadBandsKm = tileScore.roadBands;
 		var terrainSeverity = tileRecord ? tileRecord.terrainSeverity : C.TERRAIN_NORMAL;
 		var terrainScore = tileRecord && Number.isFinite(tileRecord.terrainScore)
 			? tileRecord.terrainScore
@@ -208,7 +218,7 @@ function assignTileEnums(mesh)
 			mesh.terrainScores[pointIndex] = terrainScore;
 		}
 
-		var speedClass = computeSpeedClassFromRoadBands(roadBandsKm, terrainSeverity);
+		var speedClass = tileScore.speedClass;
 		if ((!Number.isFinite(speedClass) || speedClass <= 0) && landType === C.CELL_CROSSING) {
 			speedClass = getFallbackCrossingSpeedClass();
 		}
