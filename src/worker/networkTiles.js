@@ -11,7 +11,7 @@ const NETWORK_TILE_DEFAULT_KM = {
 const NETWORK_TILE_DEFAULT_TERRAIN_SCORE = 0.10;
 const NETWORK_TILE_DECIMALS = 2;
 
-let networkTileAssignmentCache = new LruCache(4096);
+let networkTileAssignmentCache = new LruCache(C.NETWORK_TILE_CACHE_ENTRIES);
 const networkTileScoreCache = new WeakMap();
 
 function getNetworkTileFallbackRadiusSteps()
@@ -156,8 +156,7 @@ function getNetworkTileRecordForPoint(lat, lng)
 			}
 		}
 
-		if ((!exactRecord || exactRecord.road) && roadMatches.length && terrainMatches.length) break;
-		if (exactRecord && !exactRecord.road && roadMatches.length && terrainMatches.length) break;
+		if (roadMatches.length && terrainMatches.length) break;
 	}
 
 	var roadStats = exactRecord && exactRecord.road ? exactRecord.road : buildWeightedRoadTileStats(roadMatches);

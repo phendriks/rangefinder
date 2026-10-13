@@ -128,7 +128,7 @@ async function main() {
 	assert.equal(calls.length, allTiles);
 
 	const messages = [];
-	const jobs = context(['config/base-constants', 'shared/lruCache', 'worker/calculationJobs'], {
+	const jobs = context(['config/base-constants', 'config/travel-constants', 'shared/lruCache', 'worker/calculationJobs'], {
 		postMessage: message => messages.push(message),
 		ensureLandLoaded: async () => {},
 		configureVectorRoadCache: () => {},

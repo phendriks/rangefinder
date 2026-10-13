@@ -4,7 +4,7 @@ let activeRangeJob = null;
 let pendingRangeJob = null;
 let rangeCacheConfigured = false;
 let cachedRangeField = null;
-let rangeResultCache = new LruCache(2);
+let rangeResultCache = new LruCache(C.RANGE_RESULT_CACHE_ENTRIES);
 
 function rangeFieldKey(request) {
 	return JSON.stringify([request.clat, request.clng, request.modeKey, request.outerKm]);
@@ -24,10 +24,10 @@ function configureRangeCaches(lowMemory) {
 	if (rangeCacheConfigured) return;
 	rangeCacheConfigured = true;
 	configureVectorRoadCache(lowMemory);
-	const entries = lowMemory ? 1024 : 4096;
+	const entries = lowMemory ? C.NETWORK_TILE_MOBILE_CACHE_ENTRIES : C.NETWORK_TILE_CACHE_ENTRIES;
 	networkTileRecordCache = new LruCache(entries);
 	networkTileAssignmentCache = new LruCache(entries);
-	rangeResultCache = new LruCache(lowMemory ? 1 : 2);
+	rangeResultCache = new LruCache(lowMemory ? C.RANGE_RESULT_MOBILE_CACHE_ENTRIES : C.RANGE_RESULT_CACHE_ENTRIES);
 }
 
 function handleRangeWorkerMessage(event) {
@@ -142,7 +142,7 @@ async function runRangeJob(job) {
 		if (job.controller.signal.aborted) return;
 		postRangeMessage(job, { type: 'status', msg: 'Walking land graph...' });
 		const costs = computeDistanceField(mesh, outerKm, clat, clng);
-		field = { key: fieldKey, mesh, costs, grid: buildRangeGrid(mesh), contours: new LruCache(6) };
+		field = { key: fieldKey, mesh, costs, grid: buildRangeGrid(mesh), contours: new LruCache(C.RANGE_CONTOUR_CACHE_ENTRIES) };
 		if (cacheable) cachedRangeField = field;
 	}
 	await yieldRangeWorker();

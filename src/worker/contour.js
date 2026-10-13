@@ -136,7 +136,6 @@ function stitchContourSegments(segments) {
 		let curSeg = segs[i];
 		curSeg.used = true;
 		let startKey = curSeg.ka;
-		let prevKey = curSeg.ka;
 		let curKey = curSeg.kb;
 		ring.push(curSeg.a);
 		ring.push(curSeg.b);
@@ -157,7 +156,6 @@ function stitchContourSegments(segments) {
 			const nextKey = s.ka === curKey ? s.kb : s.ka;
 			const nextPt = s.ka === curKey ? s.b : s.a;
 			ring.push(nextPt);
-			prevKey = curKey;
 			curKey = nextKey;
 		}
 
@@ -169,14 +167,6 @@ function stitchContourSegments(segments) {
 
 function pointKey(p, scale) {
 	return String(Math.round(p[0] * scale)) + ':' + String(Math.round(p[1] * scale));
-}
-
-function xyToLngLat(mesh, p) {
-	const refLatRad = mesh.clat * Math.PI / 180;
-	const cosLat = Math.cos(refLatRad);
-	const lng = mesh.clng + (p[0] / (C.KM_PER_DEG_LAT * cosLat));
-	const lat = mesh.clat + (p[1] / C.KM_PER_DEG_LAT);
-	return [lng, lat];
 }
 
 function signedAreaLngLat(ring) {
@@ -224,14 +214,6 @@ function beautifyRing(ring, mesh) {
 	if (ratio < (1 - C.CONTOUR_AREA_RATIO) || ratio > (1 + C.CONTOUR_AREA_RATIO)) return orig;
 
 	return out;
-}
-
-function lngLatToXy(mesh, p) {
-	const refLatRad = mesh.clat * Math.PI / 180;
-	const cosLat = Math.cos(refLatRad);
-	const x = (p[0] - mesh.clng) * (C.KM_PER_DEG_LAT * cosLat);
-	const y = (p[1] - mesh.clat) * C.KM_PER_DEG_LAT;
-	return [x, y];
 }
 
 function simplifyRingXy(ringXy, minKm) {

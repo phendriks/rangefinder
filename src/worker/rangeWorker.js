@@ -12,6 +12,7 @@ importScripts('../config/ui-constants.js');
 importScripts('../shared/lruCache.js');
 importScripts('../shared/math.js');
 importScripts('../shared/geo.js');
+importScripts('../shared/localProjection.js');
 importScripts('../shared/minHeap.js');
 importScripts('../shared/spatialHash.js');
 importScripts('../domain/speedClass.js');
@@ -24,6 +25,7 @@ importScripts('../data/north-africa-tiles.js');
 importScripts('../data/middle-east-tiles.js');
 importScripts('networkTiles.js');
 importScripts('land.js');
+networkLandPointClassifier = isBufferedLandPoint;
 importScripts('grid.js');
 importScripts('vectorRoadTiles.js');
 importScripts('mesh.js');
@@ -87,8 +89,7 @@ function findClosestMeshIndex(mesh, lat, lng, requireNonWater)
 	}
 
 	const cosLat = Math.cos(lat * Math.PI / 180);
-	const x = (lng - mesh.clng) * C.KM_PER_DEG_LAT * cosLat;
-	const y = (lat - mesh.clat) * C.KM_PER_DEG_LAT;
+	const [x, y] = projectLatLng(lat, lng, mesh.clat, mesh.clng, cosLat);
 	const originHash = mesh.originHash;
 	if (!originHash || !originHash.hash) {
 		return requireNonWater

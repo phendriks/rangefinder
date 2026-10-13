@@ -13,10 +13,11 @@ function haversineKm(a, b) {
 	return C.EARTH_RADIUS_KM * c;
 }
 
-function findClosestIndex(pts, lat, lng) {
+function findClosestIndex(pts, lat, lng, cellTypes = null) {
 	var best = -1;
 	var bestDist = Infinity;
 	for (var i = 0; i < pts.length; i++) {
+		if (cellTypes && cellTypes[i] === C.CELL_WATER) continue;
 		var d = haversineKm([lat, lng], pts[i]);
 		if (d < bestDist) { bestDist = d; best = i; }
 	}
@@ -24,12 +25,9 @@ function findClosestIndex(pts, lat, lng) {
 }
 
 function findClosestNonWaterIndex(pts, cellTypes, lat, lng) {
-	var best = -1;
-	var bestDist = Infinity;
-	for (var i = 0; i < pts.length; i++) {
-		if (cellTypes[i] === C.CELL_WATER) continue;
-		var d = haversineKm([lat, lng], pts[i]);
-		if (d < bestDist) { bestDist = d; best = i; }
-	}
-	return best;
+	return findClosestIndex(pts, lat, lng, cellTypes);
+}
+
+function undirectedEdgeKey(a, b) {
+	return a < b ? a + ',' + b : b + ',' + a;
 }

@@ -1,7 +1,6 @@
 // app.js
 // Map setup and shared app state.
 
-const MAP_EL = document.getElementById('map');
 const map = L.map('map', {
 	center: C.MAP_INITIAL_CENTER,
 	zoom: C.MAP_INITIAL_ZOOM,
@@ -24,7 +23,7 @@ function isMobile()
 
 function updateMapLayout()
 {
-	MAP_EL.style.marginLeft = isMobile() ? '' : (C.SIDEBAR_WIDTH_PX + 'px');
+	ELS.map.style.marginLeft = isMobile() ? '' : (C.SIDEBAR_WIDTH_PX + 'px');
 	map.invalidateSize();
 }
 

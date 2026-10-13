@@ -1,31 +1,3 @@
-const ELS = {
-	calc: document.getElementById('calc'),
-	clear: document.getElementById('clr'),
-	distanceLabel: document.getElementById('ld'),
-	distancePanel: document.getElementById('dp'),
-	distanceToggle: document.getElementById('dtg'),
-	legend: document.getElementById('leg'),
-	location: document.getElementById('loc'),
-	locationWrap: document.getElementById('lw'),
-	maxDistanceInput: document.getElementById('mad'),
-	maxDistanceSlider: document.getElementById('mads'),
-	maxTimeInput: document.getElementById('mah'),
-	maxTimeSlider: document.getElementById('mas'),
-	minDistanceInput: document.getElementById('mid'),
-	minDistanceSlider: document.getElementById('mids'),
-	minTimeInput: document.getElementById('mih'),
-	minTimeSlider: document.getElementById('mis'),
-	modeNote: document.getElementById('sn'),
-	progressBar: document.getElementById('progress-bar'),
-	showGrid: document.getElementById('show-grid'),
-	statusArea: document.getElementById('status-area'),
-	statusMsg: document.getElementById('status-msg'),
-	suggestions: document.getElementById('sug'),
-	timeLabel: document.getElementById('lt'),
-	timePanel: document.getElementById('tp')
-};
-
-const MODE_BUTTONS = Array.from(document.querySelectorAll('.mb'));
 const ACTIVE_MEASURE_LABEL_CLASS = 'measure-label-active';
 const MUTED_MEASURE_LABEL_CLASS = 'measure-label-muted';
 
@@ -38,41 +10,6 @@ function setMode(modeKey)
 	ELS.modeNote.textContent = C.MODE_NOTE[modeKey] || '';
 	clearOverlay();
 	schedulePreparation(true);
-}
-
-function syncRangePair(nextValue, minValue, maxValue, inputEl, sliderEl)
-{
-	const safeValue = Math.max(minValue, Math.min(maxValue, +nextValue));
-	inputEl.value = safeValue;
-	sliderEl.value = safeValue;
-}
-
-function setTimeMin(nextValue)
-{
-	const maxAllowed = +ELS.maxTimeInput.value - C.UI_TIME_STEP_HOURS;
-	syncRangePair(nextValue, C.UI_TIME_MIN_HOURS, maxAllowed, ELS.minTimeInput, ELS.minTimeSlider);
-	schedulePreparation();
-}
-
-function setTimeMax(nextValue)
-{
-	const minAllowed = +ELS.minTimeInput.value + C.UI_TIME_STEP_HOURS;
-	syncRangePair(nextValue, minAllowed, C.UI_TIME_MAX_HOURS, ELS.maxTimeInput, ELS.maxTimeSlider);
-	schedulePreparation();
-}
-
-function setDistanceMin(nextValue)
-{
-	const maxAllowed = +ELS.maxDistanceInput.value - C.UI_DIST_STEP_KM;
-	syncRangePair(nextValue, C.UI_DIST_MIN_KM, maxAllowed, ELS.minDistanceInput, ELS.minDistanceSlider);
-	schedulePreparation();
-}
-
-function setDistanceMax(nextValue)
-{
-	const minAllowed = +ELS.minDistanceInput.value + C.UI_DIST_STEP_KM;
-	syncRangePair(nextValue, minAllowed, C.UI_DIST_MAX_KM, ELS.maxDistanceInput, ELS.maxDistanceSlider);
-	schedulePreparation();
 }
 
 function setMeasureLabelState(activeEl, mutedEl)
@@ -212,35 +149,6 @@ async function handleMapClick(evt)
 	} catch {}
 }
 
-function getRangeRequest()
-{
-	const baseSpeedKmh = C.MODE_SPEED_KMH[activeModeKey];
-	const modeTau = C.MODE_TORTUOSITY[activeModeKey];
-	const terrainTau = C.TERRAIN_TAU_DEFAULT;
-	const totalTau = modeTau * terrainTau;
-	const effectiveSpeedKmh = baseSpeedKmh / totalTau;
-
-	if (!useDist) {
-		const minHours = +ELS.minTimeInput.value;
-		const maxHours = +ELS.maxTimeInput.value;
-		return {
-			outerKm: effectiveSpeedKmh * maxHours,
-			innerKm: effectiveSpeedKmh * minHours,
-			outerLegendLabel: `Outer: ~${fmt(effectiveSpeedKmh * maxHours)} km (${maxHours} hr)`,
-			innerLegendLabel: `Inner: ~${fmt(effectiveSpeedKmh * minHours)} km (${minHours} hr)`
-		};
-	}
-
-	const minDistanceKm = +ELS.minDistanceInput.value;
-	const maxDistanceKm = +ELS.maxDistanceInput.value;
-	return {
-		outerKm: maxDistanceKm / totalTau,
-		innerKm: minDistanceKm / totalTau,
-		outerLegendLabel: `Outer: ~${fmt(maxDistanceKm / totalTau)} km (${maxDistanceKm} km road)`,
-		innerLegendLabel: `Inner: ~${fmt(minDistanceKm / totalTau)} km (${minDistanceKm} km road)`
-	};
-}
-
 function handleWorkerMessage(evt, outerLegendLabel, innerLegendLabel)
 {
 	const msg = evt.data;
@@ -287,14 +195,7 @@ MODE_BUTTONS.forEach(button => {
 });
 setMode(activeModeKey);
 
-ELS.minTimeInput.addEventListener('change', evt => setTimeMin(evt.target.value));
-ELS.minTimeSlider.addEventListener('input', evt => setTimeMin(evt.target.value));
-ELS.maxTimeInput.addEventListener('change', evt => setTimeMax(evt.target.value));
-ELS.maxTimeSlider.addEventListener('input', evt => setTimeMax(evt.target.value));
-ELS.minDistanceInput.addEventListener('change', evt => setDistanceMin(evt.target.value));
-ELS.minDistanceSlider.addEventListener('input', evt => setDistanceMin(evt.target.value));
-ELS.maxDistanceInput.addEventListener('change', evt => setDistanceMax(evt.target.value));
-ELS.maxDistanceSlider.addEventListener('input', evt => setDistanceMax(evt.target.value));
+bindRangeControls();
 
 ELS.distanceToggle.addEventListener('change', updateMeasureMode);
 updateMeasureMode();
@@ -333,18 +234,17 @@ document.addEventListener('click', evt => {
 map.on('click', handleMapClick);
 ELS.calc.addEventListener('click', startCalculation);
 
-const USE_LOCATION_BUTTON = document.getElementById('use-location');
-USE_LOCATION_BUTTON.addEventListener('click', () => {
+ELS.useLocation.addEventListener('click', () => {
 	if (!navigator.geolocation) {
 		alert('Location is unavailable. Select an address or tap the map.');
 		return;
 	}
-	USE_LOCATION_BUTTON.disabled = true;
-	USE_LOCATION_BUTTON.textContent = 'Locating...';
+	ELS.useLocation.disabled = true;
+	ELS.useLocation.textContent = 'Locating...';
 	const previousCoords = coords;
 	function finishLocating() {
-		USE_LOCATION_BUTTON.disabled = false;
-		USE_LOCATION_BUTTON.textContent = 'Use my location';
+		ELS.useLocation.disabled = false;
+		ELS.useLocation.textContent = 'Use my location';
 	}
 	navigator.geolocation.getCurrentPosition(position => {
 		finishLocating();

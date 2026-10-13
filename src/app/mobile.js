@@ -1,46 +1,16 @@
 'use strict';
 
-const MOBILE_BREAKPOINT_FALLBACK = 640;
-const SHEET_TRANSITION_FALLBACK_MS = 350;
 const MINIBAR_VISIBLE_CLASS = 'mini-bar-visible';
 const MINI_HIDDEN_CLASS = 'mini-hidden';
 
 (function () {
-	function $(id)
-	{
-		return document.getElementById(id);
-	}
-
-	const sidebar = $('sidebar');
-	const sheetTop = $('sheet-top');
-	const subtitle = $('sheet-subtitle');
-	const miniBar = $('mini-bar');
-	const miniExpand = $('mini-expand');
-	const miniMode = $('mini-mode');
-	const miniDistanceToggle = $('mini-dtg');
-	const miniTimeLabel = $('mini-lt');
-	const miniDistanceLabel = $('mini-ld');
-	const miniMin = $('mini-min');
-	const miniMax = $('mini-max');
-	const miniUnit = $('mini-unit');
-	const miniCalc = $('mini-calc');
+	const {
+		sidebar, sheetTop, sheetSubtitle: subtitle, miniBar, miniExpand,
+		miniMode, miniDistanceToggle, miniTimeLabel, miniDistanceLabel,
+		miniMin, miniMax, miniUnit, miniCalc
+	} = ELS;
 	const body = document.body;
 	if (!sidebar || !sheetTop || !subtitle) return;
-
-	function getMobileBreakpoint()
-	{
-		return window.C && C.MOBILE_BREAKPOINT_PX ? C.MOBILE_BREAKPOINT_PX : MOBILE_BREAKPOINT_FALLBACK;
-	}
-
-	function getSheetTransitionMs()
-	{
-		return window.C && C.SHEET_TRANSITION_MS ? C.SHEET_TRANSITION_MS : SHEET_TRANSITION_FALLBACK_MS;
-	}
-
-	function isMobileViewport()
-	{
-		return window.innerWidth < getMobileBreakpoint();
-	}
 
 	function isSheetCollapsed()
 	{
@@ -63,7 +33,7 @@ const MINI_HIDDEN_CLASS = 'mini-hidden';
 	{
 		setTimeout(function () {
 			if (typeof map !== 'undefined' && map && map.invalidateSize) map.invalidateSize();
-		}, getSheetTransitionMs());
+		}, C.SHEET_TRANSITION_MS);
 	}
 
 	function setSheetCollapsed(collapsed)
@@ -81,20 +51,13 @@ const MINI_HIDDEN_CLASS = 'mini-hidden';
 		body.classList.toggle(MINIBAR_VISIBLE_CLASS, !hidden);
 	}
 
-	function getInputValue(id)
-	{
-		const el = $(id);
-		return el ? el.value : '';
-	}
-
 	function dispatchInputEvent(el, eventName)
 	{
 		el.dispatchEvent(new Event(eventName, { bubbles: true }));
 	}
 
-	function setUnderlyingValue(inputId, value)
+	function setUnderlyingValue(el, value)
 	{
-		const el = $(inputId);
 		if (!el) return;
 		el.value = value;
 		dispatchInputEvent(el, 'input');
@@ -103,7 +66,7 @@ const MINI_HIDDEN_CLASS = 'mini-hidden';
 
 	function setUnderlyingToggle(checked)
 	{
-		const distanceToggle = $('dtg');
+		const distanceToggle = ELS.distanceToggle;
 		if (!distanceToggle) return;
 		distanceToggle.checked = checked;
 		dispatchInputEvent(distanceToggle, 'change');
@@ -111,7 +74,7 @@ const MINI_HIDDEN_CLASS = 'mini-hidden';
 
 	function getActiveModeKey()
 	{
-		const activeModeButton = document.querySelector('.mb.active');
+		const activeModeButton = MODE_BUTTONS.find(button => button.classList.contains('active'));
 		return activeModeButton ? activeModeButton.dataset.mode : 'drive';
 	}
 
@@ -124,7 +87,7 @@ const MINI_HIDDEN_CLASS = 'mini-hidden';
 	function syncMiniToggleFromSidebar()
 	{
 		if (!hasMiniBar()) return;
-		const distanceToggle = $('dtg');
+		const distanceToggle = ELS.distanceToggle;
 		const useDistance = !!(distanceToggle && distanceToggle.checked);
 		miniDistanceToggle.checked = useDistance;
 		miniTimeLabel.classList.toggle('mini-on', !useDistance);
@@ -134,21 +97,12 @@ const MINI_HIDDEN_CLASS = 'mini-hidden';
 	function syncMiniRangeFromSidebar()
 	{
 		if (!hasMiniBar()) return;
-		const distanceToggle = $('dtg');
-		const useDistance = !!(distanceToggle && distanceToggle.checked);
-		if (useDistance) {
-			miniUnit.textContent = 'km';
-			if (document.activeElement !== miniMin) miniMin.value = getInputValue('mid');
-			if (document.activeElement !== miniMax) miniMax.value = getInputValue('mad');
-			miniMin.step = getInputValue('mid') ? $('mid').step : '10';
-			miniMax.step = getInputValue('mad') ? $('mad').step : '10';
-		} else {
-			miniUnit.textContent = 'hr';
-			if (document.activeElement !== miniMin) miniMin.value = getInputValue('mih');
-			if (document.activeElement !== miniMax) miniMax.value = getInputValue('mah');
-			miniMin.step = getInputValue('mih') ? $('mih').step : '0.5';
-			miniMax.step = getInputValue('mah') ? $('mah').step : '0.5';
-		}
+		const controls = getRangeControls();
+		miniUnit.textContent = controls.unit;
+		if (document.activeElement !== miniMin) miniMin.value = controls.minInput.value;
+		if (document.activeElement !== miniMax) miniMax.value = controls.maxInput.value;
+		miniMin.step = controls.minInput.value ? controls.minInput.step : String(controls.step);
+		miniMax.step = controls.maxInput.value ? controls.maxInput.step : String(controls.step);
 	}
 
 	function syncMiniBarFromSidebar()
@@ -161,25 +115,16 @@ const MINI_HIDDEN_CLASS = 'mini-hidden';
 
 	function syncSidebarRangeFromMiniBar()
 	{
-		const distanceToggle = $('dtg');
-		const useDistance = !!(distanceToggle && distanceToggle.checked);
-		
-		const minValue = miniMin.value;
-        const maxValue = miniMax.value;
-
-		if (useDistance) {
-			setUnderlyingValue('mid', miniMin.value);
-			setUnderlyingValue('mad', miniMax.value);
-			return;
-		}
-		setUnderlyingValue('mih', miniMin.value);
-		setUnderlyingValue('mah', miniMax.value);
+		const controls = getRangeControls();
+		// Preserve the existing input/change event order and focus-sensitive sync.
+		setUnderlyingValue(controls.minInput, miniMin.value);
+		setUnderlyingValue(controls.maxInput, miniMax.value);
 	}
 
 	function updateMiniBarVisibility()
 	{
 		if (!hasMiniBar()) return;
-		if (!isMobileViewport()) {
+		if (!isMobile()) {
 			setMiniBarHidden(true);
 			return;
 		}
@@ -194,7 +139,7 @@ const MINI_HIDDEN_CLASS = 'mini-hidden';
 
 	sheetTop.addEventListener('click', function (e) {
 		e.stopPropagation();
-		if (!isMobileViewport()) return;
+		if (!isMobile()) return;
 		setSheetCollapsed(!isSheetCollapsed());
 	});
 	
@@ -204,7 +149,7 @@ const MINI_HIDDEN_CLASS = 'mini-hidden';
 	});
 
 	window.addEventListener('resize', function () {
-		if (!isMobileViewport()) sidebar.classList.remove('sheet-collapsed');
+		if (!isMobile()) sidebar.classList.remove('sheet-collapsed');
 		updateSheetAria();
 		updateMiniBarVisibility();
 		syncMiniBarFromSidebar();
@@ -212,17 +157,17 @@ const MINI_HIDDEN_CLASS = 'mini-hidden';
 
 	if (typeof map !== 'undefined' && map && map.on) {
 		map.on('click', function (e) {
-			if (!isMobileViewport() || isSheetCollapsed()) return;
+			if (!isMobile() || isSheetCollapsed()) return;
 
 			const target = e.originalEvent?.target;
 			if (target?.closest('#sidebar') || target?.closest('#mini-bar')) return;
-	setSheetCollapsed(true);
-});
+			setSheetCollapsed(true);
+		});
 	}
 
 	if (hasMiniBar()) {
 		miniMode.addEventListener('change', function () {
-			const modeButton = document.querySelector('.mb[data-mode="' + this.value + '"]');
+			const modeButton = MODE_BUTTONS.find(button => button.dataset.mode === this.value);
 			if (modeButton) modeButton.click();
 			syncMiniBarFromSidebar();
 		});
@@ -237,23 +182,18 @@ const MINI_HIDDEN_CLASS = 'mini-hidden';
 
 		miniCalc.addEventListener('click', function () {
 			syncSidebarRangeFromMiniBar();
-			const calcButton = $('calc');
+			const calcButton = ELS.calc;
 			if (calcButton) calcButton.click();
 		});
 
-		miniExpand.addEventListener('click', function () {
-			openSheet();
-		});
-
-		const controlsToSync = ['dtg', 'mih', 'mah', 'mid', 'mad'];
-		controlsToSync.forEach(function (id) {
-			const el = $(id);
+		const controlsToSync = [ELS.distanceToggle, ...Object.values(RANGE_CONTROLS).flatMap(controls => [controls.minInput, controls.maxInput])];
+		controlsToSync.forEach(function (el) {
 			if (!el) return;
 			el.addEventListener('change', syncMiniBarFromSidebar);
 			el.addEventListener('input', syncMiniBarFromSidebar);
 		});
 
-		Array.from(document.querySelectorAll('.mb')).forEach(function (button) {
+		MODE_BUTTONS.forEach(function (button) {
 			button.addEventListener('click', syncMiniBarFromSidebar);
 		});
 
@@ -264,7 +204,7 @@ const MINI_HIDDEN_CLASS = 'mini-hidden';
 		observer.observe(sidebar, { attributes: true, attributeFilter: ['class'] });
 	}
 
-	if (!isMobileViewport()) sidebar.classList.remove('sheet-collapsed');
+	if (!isMobile()) sidebar.classList.remove('sheet-collapsed');
 	updateSheetAria();
 	updateMiniBarVisibility();
 	syncMiniBarFromSidebar();

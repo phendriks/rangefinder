@@ -355,7 +355,7 @@ function buildVectorRoadGraph(lines, spacingMultiplier)
 			var from = getNodeIndex(sampled[pointIndex - 1], line.bridge);
 			var to = getNodeIndex(sampled[pointIndex], line.bridge);
 			if (from === to) continue;
-			var key = from < to ? from + ',' + to : to + ',' + from;
+			var key = undirectedEdgeKey(from, to);
 			var existing = edgeIndex.get(key);
 			if (existing === undefined) {
 				edgeIndex.set(key, edges.length);

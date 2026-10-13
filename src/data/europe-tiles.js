@@ -3595,6 +3595,6 @@ registerNetworkTileSource(tileInfo => {
 		);
 	}
 	if (!isTileInfoInBounds(tileInfo, EUROPE_BOUNDS)) return null;
-	if (!isLandPoint(tileInfo.centerLat, tileInfo.centerLng)) return null;
+	if (!networkLandPointClassifier(tileInfo.centerLat, tileInfo.centerLng)) return null;
 	return buildNetworkTileRecord(null, buildTerrainDataForRegion(EUROPE_TERRAIN_CONFIG, tileInfo));
 });

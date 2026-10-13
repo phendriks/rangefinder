@@ -190,7 +190,7 @@ function addExplicitVectorRoadEdges(mesh, vectorRoadData) {
 		const distanceKm = haversineKm(mesh.pts[a], mesh.pts[b]);
 		const modeSpeedKmh = Number(C.MODE_SPEED_KMH[mesh.modeKey]) || C.MODE_SPEED_KMH.drive;
 		const cost = distanceKm * (modeSpeedKmh / speedKmh);
-		const key = a < b ? a + ',' + b : b + ',' + a;
+		const key = undirectedEdgeKey(a, b);
 		const existing = overrides.get(key);
 		if (existing === undefined || cost < existing) overrides.set(key, cost);
 	}
@@ -215,14 +215,14 @@ function buildDelaunayMesh(pts, clat, clng, N, stepKmHint) {
 	for (let i = 0; i < pts.length; i++) {
 		const lat = pts[i][0];
 		const lng = pts[i][1];
-		const x0 = (lng - clng) * C.KM_PER_DEG_LAT * cosLat;
-		const y0 = (lat - clat) * C.KM_PER_DEG_LAT;
+		const basePoint = projectLatLng(lat, lng, clat, clng, cosLat);
+		const [x0, y0] = basePoint;
 		let x = x0;
 		let y = y0;
 		x += (hash01(i, 0) - 0.5) * jitterAmpKm;
 		y += (hash01(i, 1) - 0.5) * jitterAmpKm;
 		xy[i] = [x, y];
-		xyBase[i] = [x0, y0];
+		xyBase[i] = basePoint;
 	}
 	const maxEdgeKm = stepKm * C.DELAUNAY_MAX_EDGE_FACTOR;
 
@@ -337,36 +337,6 @@ function lloydRelax(sites, minLat, maxLat, minLng, maxLng, clat, clng, N, stepKm
 
 	return xyToSites(xy, clat, clng);
 }
-function sitesToXy(sites, clat, clng) {
-	const refLatRad = clat * Math.PI / 180;
-	const cosLat = Math.cos(refLatRad);
-	const xy = new Array(sites.length);
-	for (let i = 0; i < sites.length; i++) {
-		const lat = sites[i].lat;
-		const lng = sites[i].lng;
-		xy[i] = [
-			(lng - clng) * C.KM_PER_DEG_LAT * cosLat,
-			(lat - clat) * C.KM_PER_DEG_LAT
-		];
-	}
-	return xy;
-}
-
-function xyToSites(xy, clat, clng) {
-	const refLatRad = clat * Math.PI / 180;
-	const cosLat = Math.cos(refLatRad);
-	const invLngScale = 1 / (C.KM_PER_DEG_LAT * cosLat);
-	const invLatScale = 1 / C.KM_PER_DEG_LAT;
-	const sites = new Array(xy.length);
-	for (let i = 0; i < xy.length; i++) {
-		const p = xy[i];
-		sites[i] = {
-			lat: clat + (p[1] * invLatScale),
-			lng: clng + (p[0] * invLngScale)
-		};
-	}
-	return sites;
-}
 function sampleCostsToRaster(mesh, costs, raster) {
 	const clat = mesh.clat;
 	const clng = mesh.clng;
@@ -381,8 +351,7 @@ function sampleCostsToRaster(mesh, costs, raster) {
 	for (let i = 0; i < raster.pts.length; i++) {
 		const lat = raster.pts[i][0];
 		const lng = raster.pts[i][1];
-		const x = (lng - clng) * C.KM_PER_DEG_LAT * cosLat;
-		const y = (lat - clat) * C.KM_PER_DEG_LAT;
+		const [x, y] = projectLatLng(lat, lng, clat, clng, cosLat);
 		const idx = findNearestIndex(hash, sitesXy, cellSize, x, y);
 		if (idx < 0) continue;
 		out[i] = costs[idx];
@@ -418,7 +387,7 @@ function buildEdgeCosts(mesh) {
 			const nIdx = nbs[k];
 			let vectorRoadCost;
 			if (mesh.vectorRoadEdgeCosts) {
-				const edgeKey = i < nIdx ? i + ',' + nIdx : nIdx + ',' + i;
+				const edgeKey = undirectedEdgeKey(i, nIdx);
 				vectorRoadCost = mesh.vectorRoadEdgeCosts.get(edgeKey);
 			}
 			if (vectorRoadCost !== undefined) {

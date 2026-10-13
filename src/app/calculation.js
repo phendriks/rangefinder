@@ -29,26 +29,20 @@ function ensureRangeWorker() {
 }
 
 function cancelCalculation() {
-	clearTimeout(preparationTimer);
-	preparationTimer = null;
+	clearPreparationTimer();
 	activeCalculation = null;
 	if (worker) worker.postMessage({ type: 'cancel' });
 }
 
 function schedulePreparation(immediate = false) {
-	clearTimeout(preparationTimer);
-	preparationTimer = null;
+	clearPreparationTimer();
 	if (!coords) return;
 	function prepare() {
 		preparationTimer = null;
 		const range = getRangeRequest();
 		if (!Number.isFinite(range.outerKm) || range.outerKm <= 0) return;
 		try {
-			ensureRangeWorker().postMessage({
-				type: 'prepare', requestId: ++calculationSequence,
-				clat: coords.lat, clng: coords.lng, modeKey: activeModeKey,
-				outerKm: range.outerKm, innerKm: range.innerKm
-			});
+			ensureRangeWorker().postMessage(buildCalculationRequest('prepare', range, ++calculationSequence));
 		} catch {
 			// Preparation is optional; Show can retry worker startup.
 		}
@@ -58,15 +52,10 @@ function schedulePreparation(immediate = false) {
 }
 
 function submitCalculation(range) {
-	clearTimeout(preparationTimer);
-	preparationTimer = null;
+	clearPreparationTimer();
 	activeCalculation = { ...range, requestId: ++calculationSequence };
 	try {
-		ensureRangeWorker().postMessage({
-			type: 'calculate', requestId: activeCalculation.requestId,
-			clat: coords.lat, clng: coords.lng, modeKey: activeModeKey,
-			outerKm: range.outerKm, innerKm: range.innerKm
-		});
+		ensureRangeWorker().postMessage(buildCalculationRequest('calculate', range, activeCalculation.requestId));
 	} catch (error) {
 		activeCalculation = null;
 		setCalcBusyState(false);
@@ -76,4 +65,16 @@ function submitCalculation(range) {
 
 function warmRangeWorker() {
 	try { ensureRangeWorker(); } catch { /* Retry when a location is selected. */ }
+}
+
+function clearPreparationTimer() {
+	clearTimeout(preparationTimer);
+	preparationTimer = null;
+}
+
+function buildCalculationRequest(type, range, requestId) {
+	return {
+		type, requestId, clat: coords.lat, clng: coords.lng, modeKey: activeModeKey,
+		outerKm: range.outerKm, innerKm: range.innerKm
+	};
 }

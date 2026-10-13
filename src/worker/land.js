@@ -21,6 +21,15 @@ function bufferFeatureIfNeeded(feature) {
 	const buffered = turf.buffer(feature, bufferKm, { units: 'kilometers' });
 	return buffered || feature;
 }
+
+function buildBufferedRingFeature(ring, name) {
+	const closedRing = normalizeRingIfNeeded(ring);
+	if (!closedRing || closedRing.length < 4) return null;
+	const poly = bufferFeatureIfNeeded(turf.polygon([closedRing], { name }));
+	const bbox = turf.bbox(poly);
+	return { bbox: [bbox[1], bbox[3], bbox[0], bbox[2]], poly };
+}
+
 async function ensureLandLoaded() {
 	if (landFeatures) return;
 	self.postMessage({ type: 'status', msg: 'Loading land data...' });
@@ -32,14 +41,8 @@ async function ensureLandLoaded() {
 			const rings = entry && Array.isArray(entry.polys) ? entry.polys : null;
 			if (!rings || !rings.length) continue;
 			for (const ring of rings) {
-				const closedRing = normalizeRingIfNeeded(ring);
-				if (!closedRing || closedRing.length < 4) continue;
-				const poly = bufferFeatureIfNeeded(turf.polygon([closedRing], { name: entry.name }));
-				const bufferedBbox = turf.bbox(poly);
-				landFeatures.push({
-					bbox:				[bufferedBbox[1], bufferedBbox[3], bufferedBbox[0], bufferedBbox[2]],
-					poly
-				});
+				const feature = buildBufferedRingFeature(ring, entry.name);
+				if (feature) landFeatures.push(feature);
 			}
 		}
 	}
@@ -55,35 +58,15 @@ function ensureCrossingsLoaded() {
 		const rings = entry[1];
 		if (!Array.isArray(rings) || !rings.length) continue;
 		for (const ring of rings) {
-			const closedRing = normalizeRingIfNeeded(ring);
-			if (!closedRing || closedRing.length < 4) continue;
-			let minLng = Infinity;
-			let maxLng = -Infinity;
-			let minLat = Infinity;
-			let maxLat = -Infinity;
-			for (const c of closedRing) {
-				const lng = c[0];
-				const lat = c[1];
-				if (lng < minLng) minLng = lng;
-				if (lng > maxLng) maxLng = lng;
-				if (lat < minLat) minLat = lat;
-				if (lat > maxLat) maxLat = lat;
-			}
-			const bbox = [minLat, maxLat, minLng, maxLng];
-			const poly = bufferFeatureIfNeeded(turf.polygon([closedRing], { name }));
-			const bufferedBbox = turf.bbox(poly);
-			crossingFeatures.push({
-				name,
-				bbox: [bufferedBbox[1], bufferedBbox[3], bufferedBbox[0], bufferedBbox[2]],
-				poly
-			});
+			const feature = buildBufferedRingFeature(ring, name);
+			if (feature) crossingFeatures.push({ name, ...feature });
 		}
 	}
 }
-function isLandPoint(lat, lng) {
-	if (!landFeatures || !landFeatures.length) return false;
+function featuresContainPoint(features, lat, lng) {
+	if (!features || !features.length) return false;
 	let pt = null;
-	for (const f of landFeatures) {
+	for (const f of features) {
 		const b = f.bbox;
 		if (lat < b[0] || lat > b[1] || lng < b[2] || lng > b[3]) continue;
 		if (!pt) pt = turf.point([lng, lat]);
@@ -92,21 +75,16 @@ function isLandPoint(lat, lng) {
 	return false;
 }
 
+function isBufferedLandPoint(lat, lng) {
+	return featuresContainPoint(landFeatures, lat, lng);
+}
+
 function isCrossingPoint(lat, lng) {
-	if (crossingFeatures && crossingFeatures.length) {
-		let pt = null;
-		for (const f of crossingFeatures) {
-			const b = f.bbox;
-			if (lat < b[0] || lat > b[1] || lng < b[2] || lng > b[3]) continue;
-			if (!pt) pt = turf.point([lng, lat]);
-			if (turf.booleanPointInPolygon(pt, f.poly)) return true;
-		}
-	}
-	return false;
+	return featuresContainPoint(crossingFeatures, lat, lng);
 }
 
 function classifyCell(lat, lng) {
-	if (isLandPoint(lat, lng)) return C.CELL_LAND;
+	if (isBufferedLandPoint(lat, lng)) return C.CELL_LAND;
 	if (isCrossingPoint(lat, lng)) return C.CELL_CROSSING;
 	return C.CELL_WATER;
 }

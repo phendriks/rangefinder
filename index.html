@@ -76,13 +76,13 @@
 				<div class="hr range-grid">
 					<div class="hf range-field">
 						<label>Minimum</label>
-						<div class="hvr input-with-unit"><input class="hi2 range-input" type="number" id="mih" min="0.5" max="24" step="0.5" value="6"><span class="hu">hr</span></div>
-						<input type="range" id="mis" min="0.5" max="24" step="0.5" value="6">
+						<div class="hvr input-with-unit"><input class="hi2 range-input" type="number" id="mih"><span class="hu">hr</span></div>
+						<input type="range" id="mis">
 					</div>
 					<div class="hf range-field">
 						<label>Maximum</label>
-						<div class="hvr input-with-unit"><input class="hi2 range-input" type="number" id="mah" min="0.5" max="24" step="0.5" value="9"><span class="hu">hr</span></div>
-						<input type="range" id="mas" min="0.5" max="24" step="0.5" value="9">
+						<div class="hvr input-with-unit"><input class="hi2 range-input" type="number" id="mah"><span class="hu">hr</span></div>
+						<input type="range" id="mas">
 					</div>
 				</div>
 			</div>
@@ -92,13 +92,13 @@
 				<div class="dr range-grid">
 					<div class="df range-field">
 						<label>Minimum</label>
-						<div class="dvr input-with-unit"><input class="di range-input" type="number" id="mid" min="10" max="5000" step="10" value="300"><span class="hu">km</span></div>
-						<input type="range" id="mids" min="10" max="5000" step="10" value="300">
+						<div class="dvr input-with-unit"><input class="di range-input" type="number" id="mid"><span class="hu">km</span></div>
+						<input type="range" id="mids">
 					</div>
 					<div class="df range-field">
 						<label>Maximum</label>
-						<div class="dvr input-with-unit"><input class="di range-input" type="number" id="mad" min="10" max="5000" step="10" value="600"><span class="hu">km</span></div>
-						<input type="range" id="mads" min="10" max="5000" step="10" value="600">
+						<div class="dvr input-with-unit"><input class="di range-input" type="number" id="mad"><span class="hu">km</span></div>
+						<input type="range" id="mads">
 					</div>
 				</div>
 			</div>
@@ -180,7 +180,10 @@
 	<script src="./src/config/shape-constants.js"></script>
 	<script src="./src/config/ui-constants.js"></script>
 	<script src="./src/shared/lruCache.js"></script>
+	<script src="./src/shared/math.js"></script>
 	<script src="./src/data/network-tiles.js"></script>
+	<script src="./src/app/elements.js"></script>
+	<script src="./src/app/rangeControls.js"></script>
 	<script src="./src/app/app.js"></script>
 	<script src="./src/app/render.js"></script>
 	<script src="./src/app/calculation.js"></script>

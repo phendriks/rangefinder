@@ -53,19 +53,16 @@ const TERRAIN_FEATURE_WEIGHT_ZONE = 1.00;
 C.NETWORK_TILES = self.C && self.C.NETWORK_TILES ? self.C.NETWORK_TILES : Object.create(null);
 
 const NETWORK_TILE_SOURCES = [];
-let networkTileRecordCache = new LruCache(4096);
+let networkTileRecordCache = new LruCache(C.NETWORK_TILE_CACHE_ENTRIES);
 const NETWORK_TILE_LAND_CACHE = Object.create(null);
 
 let networkLandIndex = null;
-
-function clampNetworkNumber(valueFloat, minValue, maxValue)
-{
-	return Math.max(minValue, Math.min(maxValue, valueFloat));
-}
+// The worker explicitly selects its buffered classifier after loading land.js.
+let networkLandPointClassifier = isNetworkLandPoint;
 
 function clampNetworkUnit(valueFloat)
 {
-	return clampNetworkNumber(Number(valueFloat) || 0, 0, 1);
+	return clampNumber(Number(valueFloat) || 0, 0, 1);
 }
 
 function roundNetworkInt(valueFloat)
@@ -149,19 +146,9 @@ function getNetworkTileUnitsFromLatLng(lat, lng)
 	};
 }
 
-function getRoadTileUnitsFromLatLng(lat, lng)
-{
-	return getNetworkTileUnitsFromLatLng(lat, lng);
-}
-
 function buildNetworkTileKeyFromUnits(latUnits, lngUnits)
 {
 	return (latUnits * NETWORK_TILE_SIZE_DEG).toFixed(1) + '_' + (lngUnits * NETWORK_TILE_SIZE_DEG).toFixed(1);
-}
-
-function buildRoadTileKeyFromUnits(latUnits, lngUnits)
-{
-	return buildNetworkTileKeyFromUnits(latUnits, lngUnits);
 }
 
 function getNetworkTileInfoFromLatLng(lat, lng)
@@ -255,12 +242,6 @@ function getNetworkTileRecord(tileKey)
 	return null;
 }
 
-function getRoadTileStats(tileKey)
-{
-	var record = getNetworkTileRecord(tileKey);
-	return record ? record.road : null;
-}
-
 function getTerrainSeverity(tileKey)
 {
 	var record = getNetworkTileRecord(tileKey);
@@ -291,11 +272,6 @@ function getNetworkApproxDistanceKm(latA, lngA, latB, lngB)
 	return Math.sqrt((deltaLatKm * deltaLatKm) + (deltaLngKm * deltaLngKm));
 }
 
-function getRoadApproxDistanceKm(latA, lngA, latB, lngB)
-{
-	return getNetworkApproxDistanceKm(latA, lngA, latB, lngB);
-}
-
 function getDistanceToSegmentKm(lat, lng, startLng, startLat, endLng, endLat)
 {
 	var kmPerDegLat = Number(C && C.KM_PER_DEG_LAT) || NETWORK_DISTANCE_FALLBACK_KM_PER_DEG;
@@ -319,7 +295,7 @@ function getDistanceToSegmentKm(lat, lng, startLng, startLat, endLng, endLat)
 	}
 
 	var t = ((pointX - startX) * segX + (pointY - startY) * segY) / segLenSq;
-	t = clampNetworkNumber(t, 0, 1);
+	t = clampNumber(t, 0, 1);
 
 	var projX = startX + (segX * t);
 	var projY = startY + (segY * t);
@@ -484,7 +460,7 @@ function isPointInNetworkPolygon(lat, lng, poly)
 	return inside;
 }
 
-function isLandPoint(lat, lng)
+function isNetworkLandPoint(lat, lng)
 {
 	var cacheKey = lat.toFixed(2) + '_' + lng.toFixed(2);
 	if (NETWORK_TILE_LAND_CACHE[cacheKey] !== undefined) return NETWORK_TILE_LAND_CACHE[cacheKey];
@@ -631,7 +607,7 @@ function registerSyntheticNetworkRegion(config)
 
 	registerNetworkTileSource(tileInfo => {
 		if (!isTileInfoInBounds(tileInfo, config.bounds)) return null;
-		if (config.requireLand !== false && !isLandPoint(tileInfo.centerLat, tileInfo.centerLng)) return null;
+		if (config.requireLand !== false && !networkLandPointClassifier(tileInfo.centerLat, tileInfo.centerLng)) return null;
 
 		var corridorScore = getCorridorInfluenceScore(tileInfo.centerLat, tileInfo.centerLng, config.corridors);
 		var hubScore = getHubInfluenceScore(tileInfo.centerLat, tileInfo.centerLng, config.hubs);
